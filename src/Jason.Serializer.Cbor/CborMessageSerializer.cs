@@ -1,10 +1,10 @@
 using Jason.Core;
 using Jason.Core.Model;
-using Jason.Formatter.Cbor.Converters;
+using Jason.Serializer.Cbor.Converters;
 using Dahomey.Cbor;
-using JsonRpcParamsConverter = Jason.Formatter.Cbor.Converters.JsonRpcParamsConverter;
+using JsonRpcParamsConverter = Jason.Serializer.Cbor.Converters.JsonRpcParamsConverter;
 
-namespace Jason.Formatter.Cbor;
+namespace Jason.Serializer.Cbor;
 
 public class CborMessageSerializer : IMessageSerializer
 {
@@ -12,7 +12,7 @@ public class CborMessageSerializer : IMessageSerializer
 
     static CborMessageSerializer()
     {
-        _options.Registry.ConverterRegistry.RegisterConverter(typeof(JsonRpcParams), new JsonRpcParamsConverter());
+        _options.Registry.ConverterRegistry.RegisterConverter(typeof(JsonRpcParams), new Converters.JsonRpcParamsConverter());
     }
     
     public async Task SerializeAsync<T>(Stream stream, T value, CancellationToken cancellationToken = default)

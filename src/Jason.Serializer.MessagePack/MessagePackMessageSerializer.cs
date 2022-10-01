@@ -1,7 +1,7 @@
 using Jason.Core;
 using MessagePack;
 
-namespace Jason.Formatter.MessagePack;
+namespace Jason.Serializer.MessagePack;
 
 public class MessagePackMessageSerializer : IMessageSerializer
 {

@@ -2,7 +2,7 @@ using Jason.Core.Model;
 using Dahomey.Cbor.Serialization;
 using Dahomey.Cbor.Serialization.Converters;
 
-namespace Jason.Formatter.Cbor.Converters;
+namespace Jason.Serializer.Cbor.Converters;
 
 public class JsonRpcParamsConverter : CborConverterBase<JsonRpcParams>
 {
