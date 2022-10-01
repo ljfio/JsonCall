@@ -1,7 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Jason.Core.Model;
 
-namespace Jason.Core.Model;
+namespace Jason.Core.Converters;
 
 public class JsonRpcParamsConverter : JsonConverter<JsonRpcParams>
 {
