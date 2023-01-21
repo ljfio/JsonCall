@@ -11,6 +11,18 @@ public class JsonRpcParams : IDictionary<string, object>, ICollection<object>
 
     private readonly ICollection<object> _collection;
 
+    public JsonRpcParams(JsonRpcParamsType type)
+    {
+        Type = type;
+
+        if (type == JsonRpcParamsType.ByName)
+            _dictionary = new Dictionary<string, object>();
+        else if (type == JsonRpcParamsType.ByPosition)
+            _collection = new List<object>();
+        else
+            throw new ArgumentException();
+    }
+
     public JsonRpcParams(IDictionary<string, object> value)
     {
         Type = JsonRpcParamsType.ByName;
