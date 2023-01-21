@@ -11,12 +11,12 @@ public class JsonRpcParamsFormatter : IMessagePackFormatter<JsonRpcParams>
         if (value.Type == JsonRpcParamsType.ByPosition)
         {
             options.Resolver.GetFormatterWithVerify<IEnumerable<object>>()
-                .Serialize(ref writer, value.ByPositionValue, options);
+                .Serialize(ref writer, value, options);
         }
         else if (value.Type == JsonRpcParamsType.ByName)
         {
             options.Resolver.GetFormatter<IDictionary<string, object>>()
-                .Serialize(ref writer, value.ByNameValue, options);
+                .Serialize(ref writer, value, options);
         }
         else
         {

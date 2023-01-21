@@ -26,11 +26,11 @@ public class JsonRpcParamsConverter : JsonConverter<JsonRpcParams>
 
     public override void Write(Utf8JsonWriter writer, JsonRpcParams value, JsonSerializerOptions options)
     {
-        if (value.Type is JsonRpcParamsType.ByPosition)
+        if (value.Type is JsonRpcParamsType.ByPosition && value is IDictionary<string, object> dictionary)
         {
             writer.WriteStartArray();
 
-            foreach (var item in value.ByPositionValue)
+            foreach (var item in dictionary)
             {
                 writer.WriteRawValue(JsonSerializer.Serialize(item));
             }
