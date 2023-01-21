@@ -26,7 +26,7 @@ public class JsonRpcParamsConverter : JsonConverter<JsonRpcParams>
 
     public override void Write(Utf8JsonWriter writer, JsonRpcParams value, JsonSerializerOptions options)
     {
-        if (value.Type == JsonRpcParamsType.ByName && value is IEnumerable<object> collection)
+        if (value.Type == JsonRpcParamsType.ByPosition && value is IEnumerable<object> collection)
         {
             writer.WriteStartArray();
 
@@ -37,7 +37,7 @@ public class JsonRpcParamsConverter : JsonConverter<JsonRpcParams>
 
             writer.WriteEndArray();
         }
-        else if (value.Type == JsonRpcParamsType.ByPosition && value is IDictionary<string, object> dictionary)
+        else if (value.Type == JsonRpcParamsType.ByName && value is IDictionary<string, object> dictionary)
         {
             writer.WriteStartObject();
 
