@@ -1257,7 +1257,7 @@ namespace JsonCall.Specs
         [global::Xunit.TraitAttribute("Category", "FR-GEN-05")]
         [global::Xunit.InlineDataAttribute("petstore-openrpc.json", "40", new string[0])]
         [global::Xunit.InlineDataAttribute("ethereum-execution-apis.json", "41", new string[0])]
-        [global::Xunit.InlineDataAttribute("bitcoin-core-openrpc.json", "42", new string[0])]
+        [global::Xunit.InlineDataAttribute("link-example-openrpc.json", "42", new string[0])]
         public async global::System.Threading.Tasks.Task Third_PartyDocumentsGenerateCompilingClients(string document, string @__pickleIndex, string[] exampleTags)
         {
             string[] @__tags = new string[] {

@@ -199,4 +199,4 @@ Feature: Typed client generation from OpenRPC documents
       | document                          |
       | petstore-openrpc.json             |
       | ethereum-execution-apis.json      |
-      | bitcoin-core-openrpc.json         |
+      | link-example-openrpc.json         |

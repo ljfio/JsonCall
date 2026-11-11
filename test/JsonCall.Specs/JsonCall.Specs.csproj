@@ -16,6 +16,7 @@
         <PackageReference Include="Reqnroll.xUnit" Version="3.3.4" />
         <PackageReference Include="xunit" Version="2.9.3" />
         <PackageReference Include="JsonSchema.Net" Version="7.3.4" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
         <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
@@ -31,6 +32,8 @@
         <ProjectReference Include="..\..\src\JsonCall.Client\JsonCall.Client.csproj" />
         <ProjectReference Include="..\..\src\JsonCall.Server\JsonCall.Server.csproj" />
         <ProjectReference Include="..\..\src\JsonCall.OpenRpc\JsonCall.OpenRpc.csproj" />
+        <ProjectReference Include="..\..\src\JsonCall.Generator\JsonCall.Generator.csproj" />
+        <ProjectReference Include="..\..\src\JsonCall.Tool\JsonCall.Tool.csproj" />
         <ProjectReference Include="..\..\src\JsonCall.Transport\JsonCall.Transport.csproj" />
         <ProjectReference Include="..\..\src\JsonCall.AspNetCore\JsonCall.AspNetCore.csproj" />
         <ProjectReference Include="..\..\src\JsonCall.Serializer.Cbor\JsonCall.Serializer.Cbor.csproj" />

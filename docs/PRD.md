@@ -52,7 +52,8 @@ The existing prototype (`JsonCall`) proves the serializer split but has: a clien
 | `JsonCall.Server` | Transport-neutral dispatcher: method table, param binding, error mapping, streaming producers | Core |
 | `JsonCall.AspNetCore` | `MapJsonRpc`, WebSocket and SSE adapters, DI integration, endpoint metadata | Server |
 | `JsonCall.OpenRpc` | OpenRPC object model, generator from contracts, `rpc.discover` handler | Core, Server |
-| `JsonCall.OpenRpc.ClientGenerator` | Roslyn incremental source generator and CLI: `openrpc.json` to C# | none at runtime |
+| `JsonCall.Generator` | Roslyn incremental source generator: `*.openrpc.json` AdditionalFiles to C# (netstandard2.0 analyzer) | none at runtime |
+| `JsonCall.Tool` (`jsoncall`) | dotnet tool, same generator code: `generate <file>` and `generate --url <u> --discover` | none at runtime |
 
 Transport owns **framing**: WebSocket and SSE are already message-oriented; TCP and stdio use `Content-Length` header framing by default (newline-delimited selectable). The core only ever sees whole messages.
 
@@ -150,8 +151,8 @@ IDs are referenced from feature-file tags (`@FR-xxx`) so every requirement is tr
 | 1. Core + client (done) | Protocol model, serializers, `IMessageTransport`, WebSocket/TCP/stdio, correlating client | `01`-`04` features green |
 | 2. Server + hosting (done) | Dispatcher, `JsonCall.AspNetCore`, HTTP/WS, typed proxy | `03`, `06` green |
 | 3. Streaming (done, D2 still draft) | SSE and `$/stream` convention, client consumption, cleanup | `05` green, D2 ratified |
-| 4. OpenRPC out | Generator, `rpc.discover`, meta-schema validation | `07` green |
-| 5. OpenRPC in | Source generator and CLI | `08` green, round-trip proven |
+| 4. OpenRPC out (done) | Generator, `rpc.discover`, meta-schema validation | `07` green |
+| 5. OpenRPC in (done) | Source generator and CLI | `08` green, round-trip proven |
 
 ## 10. Risks
 
@@ -169,10 +170,10 @@ IDs are referenced from feature-file tags (`@FR-xxx`) so every requirement is tr
 |----|----------|----------------|
 | D1 | Own wire layer vs build on StreamJsonRpc | **Own library** (decided by product owner). |
 | D2 | Streaming wire convention | Draft in §6.4; ratify at Phase 3. |
-| D3 | Schema to C# engine | Open; spike before Phase 5. |
-| D4 | Draft 07 schema source for server-side generation | Open; spike in Phase 4. |
-| D5 | Union mapping for `oneOf`/`anyOf` | Open; proposal: abstract base plus discriminator when present, else `JsonElement`-backed wrapper. |
-| D6 | Reqnroll vs plain xUnit with Gherkin parser | Reqnroll proposed. |
+| D3 | Schema to C# engine | **Decided: own mapper** (`JsonCall.Generator/Core`). Analyzers cannot ship System.Text.Json or NJsonSchema reliably, so it includes a small position-tracking JSON parser (diagnostics carry file, line and JSON path). |
+| D4 | Draft 07 schema source for server-side generation | **Decided: own mapper** (`SchemaGenerator`). `JsonSchemaExporter` emits 2020-12-style output; a small reflection mapper gives exact Draft 07 and `components.schemas` hoisting. |
+| D5 | Union mapping for `oneOf`/`anyOf` | **Decided**: abstract base with `[JsonPolymorphic]` when every variant pins a common `const` property; variants that map to one C# type collapse to it; otherwise a generated union wrapper (`Index`, `Value`, `From*`/`As*`) plus an Info diagnostic. |
+| D6 | Reqnroll vs plain xUnit with Gherkin parser | **Decided: Reqnroll.** |
 
 ## 12. Name
 
@@ -182,3 +183,14 @@ IDs are referenced from feature-file tags (`@FR-xxx`) so every requirement is tr
 - `JsonCall`, `JsonCall.Core`, `JsonCall.Client` and `JsonCall.AspNetCore` were unclaimed on NuGet when checked (2026-11-11). Prefix reservations and trademarks were not checked; reserve the `JsonCall.` prefix on first publish.
 - Namespaces and package IDs use the `JsonCall.*` prefix. CLI tool: `jsoncall`. OpenRPC extension prefix: `x-jsoncall-`. Generator diagnostic prefix: `JSONCALL`.
 - Rejected alternatives: CallJason, JaySong, JsonCalls, JsonCalling, Colchis, Iolcus, Aeaea, Medea, Pelias, JasonRpc (Argonaut is taken).
+
+
+## 11. Implementation notes: phases 4 and 5
+
+- **OpenRPC version.** Documents declare `openrpc: 1.3.2`, the newest version the published official meta-schema (`open-rpc/meta-schema` 1.14.9) accepts; no 1.4 meta-schema has been released. The generator reads 1.0 to 1.4 and warns (JSONCALL003) about anything else. The spec scenario that says "1.4 meta-schema" validates against that release.
+- **Void methods.** A method with no result is documented without `result`, and the generator treats it as a notification.
+- **Optional parameters.** A parameter is optional when it has a default, or is nullable and nothing required follows it, so wire positions never change.
+- **`rpc.discover`.** `JsonRpcServerOptions.AddOpenRpc(...)` registers it through `AddReservedMethod`, so it works on every transport. `OpenRpcOptions.Metadata` accepts attributes such as `[Authorize]`.
+- **Generated clients** take any `JsonRpcPeer`, and send params by name, by position, or per the client default as `paramStructure` says. Documented errors become exception types deriving from `JsonRpcException`.
+- **AOT JSON context.** Source generators cannot see each other's output, so a `JsonSerializerContext` declaration is emitted only by `jsoncall generate --json-context` (the project compiles it and the System.Text.Json generator completes it).
+- **Third-party documents under test:** Petstore and the link example (open-rpc/examples) and the Ethereum execution API (CC0). Bitcoin Core publishes no OpenRPC document, so the link example replaces it.

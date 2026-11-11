@@ -3,8 +3,10 @@
     <Project Path="src/JsonCall.AspNetCore/JsonCall.AspNetCore.csproj" />
     <Project Path="src/JsonCall.Client/JsonCall.Client.csproj" />
     <Project Path="src/JsonCall.Core/JsonCall.Core.csproj" />
+    <Project Path="src/JsonCall.Generator/JsonCall.Generator.csproj" />
     <Project Path="src/JsonCall.OpenRpc/JsonCall.OpenRpc.csproj" />
     <Project Path="src/JsonCall.Server/JsonCall.Server.csproj" />
+    <Project Path="src/JsonCall.Tool/JsonCall.Tool.csproj" />
     <Project Path="src/JsonCall.Transport/JsonCall.Transport.csproj" />
   </Folder>
   <Folder Name="/Serializers/">

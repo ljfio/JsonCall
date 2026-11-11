@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AssemblyName>jsoncall</AssemblyName>
+        <RootNamespace>JsonCall.Tool</RootNamespace>
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>jsoncall</ToolCommandName>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- The tool and the source generator share one implementation, so their output is identical. -->
+        <Compile Include="..\JsonCall.Generator\Core\*.cs" LinkBase="Core" />
+    </ItemGroup>
+
+</Project>

@@ -13,6 +13,9 @@ Typed, transport-agnostic JSON-RPC 2.0 for .NET 10: one contract interface drive
 | `JsonCall.Transport` | WebSocket, TCP, stdio (Content-Length framing) and HTTP (with SSE streaming) transports |
 | `JsonCall.Serializer.Cbor`, `JsonCall.Serializer.MessagePack` | Binary wire formats (JSON is built in) |
 | `JsonCall.AspNetCore` | `AddJsonRpc` and `MapJsonRpc`: HTTP POST, SSE and WebSocket on one route |
+| `JsonCall.OpenRpc` | OpenRPC document from contracts (Draft 07 schemas, XML docs) and `rpc.discover` |
+| `JsonCall.Generator` | Source generator: typed client from `*.openrpc.json` AdditionalFiles |
+| `JsonCall.Tool` | `jsoncall` dotnet tool, the same generator on the command line |
 
 ## Quick start
 
@@ -45,8 +48,29 @@ var math = client.CreateProxy<IMath>();
 var sum = await math.AddAsync(1, 2);
 ```
 
+## OpenRPC
+
+Serve the document of your contracts on `rpc.discover`:
+
+```csharp
+builder.Services.AddJsonRpc(o => o
+    .AddContract<IMath, MathService>()
+    .AddOpenRpc(r => r.PublicBaseUrl = "https://api.example.com/rpc"));
+```
+
+Generate a typed client from a document, at build time:
+
+```xml
+<ItemGroup>
+  <PackageReference Include="JsonCall.Generator" PrivateAssets="all" />
+  <AdditionalFiles Include="api.openrpc.json" Namespace="Acme.Api" ClientName="AcmeClient" />
+</ItemGroup>
+```
+
+or with the tool: `jsoncall generate api.openrpc.json --out ./gen`, or `jsoncall generate --url https://host/rpc --discover`.
+
 ## Specifications
 
 Acceptance criteria live in [`specs/features`](specs/features) as Gherkin and run via Reqnroll + xUnit in `test/JsonCall.Specs`.
-`dotnet test` reports specs without step definitions as skipped; that count is the remaining backlog.
+All specs have step definitions. `dotnet test` reports any spec without one as skipped.
 Step definitions go in `test/JsonCall.Specs/Steps`.
