@@ -1,18 +1,16 @@
 <Solution>
   <Folder Name="/Library/">
+    <Project Path="src/JsonCall.AspNetCore/JsonCall.AspNetCore.csproj" />
     <Project Path="src/JsonCall.Client/JsonCall.Client.csproj" />
     <Project Path="src/JsonCall.Core/JsonCall.Core.csproj" />
+    <Project Path="src/JsonCall.Server/JsonCall.Server.csproj" />
+    <Project Path="src/JsonCall.Transport/JsonCall.Transport.csproj" />
   </Folder>
   <Folder Name="/Serializers/">
-    <Project Path="src/JsonCall.Serializer.Cbor/JsonCall.Serializer.Cbor.csproj">
-      <BuildType Solution="Release|*" Project="?" />
-      <Platform Solution="Release|*" Project="?" />
-      <Build Solution="Release|*" Project="false" />
-    </Project>
+    <Project Path="src/JsonCall.Serializer.Cbor/JsonCall.Serializer.Cbor.csproj" />
     <Project Path="src/JsonCall.Serializer.MessagePack/JsonCall.Serializer.MessagePack.csproj" />
   </Folder>
   <Folder Name="/Tests/">
-    <Project Path="test/JsonCall.Core.Tests.Unit/JsonCall.Core.Tests.Unit.csproj" />
     <Project Path="test/JsonCall.Specs/JsonCall.Specs.csproj" />
   </Folder>
 </Solution>

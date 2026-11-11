@@ -33,6 +33,9 @@ public sealed class WebSocketMessageTransport : IMessageTransport
         return new WebSocketMessageTransport(socket, serializer);
     }
 
+    /// <summary>Drops the connection without a close handshake.</summary>
+    public void Abort() => _socket.Abort();
+
     public async ValueTask SendAsync(ReadOnlyMemory<byte> message, CancellationToken cancellationToken = default)
     {
         try

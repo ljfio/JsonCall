@@ -193,6 +193,30 @@ public sealed class TestHost : IAsyncDisposable
         return new TestHost(app);
     }
 
+    /// <summary>A host with a header based test authentication scheme (X-Test-User, X-Test-Roles).</summary>
+    public static Task<TestHost> StartAuthAsync(TestState state, Action<WebApplication>? beforeMap = null,
+        Action<Microsoft.AspNetCore.Builder.IEndpointConventionBuilder>? configureEndpoint = null) =>
+        StartAsync(
+            services =>
+            {
+                services.AddSingleton(state);
+                services.AddJsonRpc(o =>
+                {
+                    AddContracts(o, state);
+                    o.AddContract<IAdmin, AdminService>();
+                });
+                services.AddAuthentication("Test").AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, TestAuthHandler>("Test", null);
+                services.AddAuthorization();
+            },
+            app =>
+            {
+                beforeMap?.Invoke(app);
+                app.UseAuthentication();
+                app.UseAuthorization();
+                var endpoint = app.MapJsonRpc("/rpc");
+                configureEndpoint?.Invoke(endpoint);
+            });
+
     public static Task<TestHost> StartRpcAsync(TestState state, string path = "/rpc") =>
         StartAsync(
             services => services.AddJsonRpc(o => AddContracts(o, state),
@@ -268,7 +292,8 @@ public static class Connections
     }
 
     public static async Task<Connection> ConnectAsync(string transport, TestState state, string serializerName = "json",
-        IJsonRpcHandler? clientHandler = null, TimeSpan? timeout = null, int clientStreamBuffer = 64)
+        IJsonRpcHandler? clientHandler = null, TimeSpan? timeout = null, int clientStreamBuffer = 64,
+        int transportCapacity = 0)
     {
         var serializer = Serializers.ByName(serializerName);
 
@@ -284,7 +309,7 @@ public static class Connections
         {
             case "in-memory":
             {
-                var (clientSide, serverSide) = InMemoryTransport.CreatePair();
+                var (clientSide, serverSide) = InMemoryTransport.CreatePair(transportCapacity);
                 var server = CreateServer(state);
                 var serverPeer = server.Attach(serverSide, serializer);
                 var recording = new RecordingTransport(clientSide, serializer);
@@ -424,6 +449,7 @@ public static class Connections
                     Recording = recording,
                     TransportName = transport,
                     Host = host,
+                    InnerTransport = httpTransport,
                     KillServer = async () => await host.App.StopAsync()
                 };
 
@@ -576,4 +602,53 @@ public sealed class ChannelTransport : IMessageTransport
         _writer.TryComplete();
         return ValueTask.CompletedTask;
     }
+}
+
+
+public sealed class TestAuthHandler : Microsoft.AspNetCore.Authentication.AuthenticationHandler<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions>
+{
+    public TestAuthHandler(Microsoft.Extensions.Options.IOptionsMonitor<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions> options,
+        ILoggerFactory logger, System.Text.Encodings.Web.UrlEncoder encoder)
+        : base(options, logger, encoder)
+    {
+    }
+
+    protected override Task<Microsoft.AspNetCore.Authentication.AuthenticateResult> HandleAuthenticateAsync()
+    {
+        if (!Request.Headers.TryGetValue("X-Test-User", out var user))
+            return Task.FromResult(Microsoft.AspNetCore.Authentication.AuthenticateResult.NoResult());
+
+        var claims = new List<System.Security.Claims.Claim> { new(System.Security.Claims.ClaimTypes.Name, user.ToString()) };
+
+        if (Request.Headers.TryGetValue("X-Test-Roles", out var roles))
+            claims.AddRange(roles.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(r => new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, r)));
+
+        var identity = new System.Security.Claims.ClaimsIdentity(claims, "Test");
+        var ticket = new Microsoft.AspNetCore.Authentication.AuthenticationTicket(
+            new System.Security.Claims.ClaimsPrincipal(identity), "Test");
+
+        return Task.FromResult(Microsoft.AspNetCore.Authentication.AuthenticateResult.Success(ticket));
+    }
+}
+
+public sealed class AdminService : IAdmin
+{
+    private readonly Microsoft.AspNetCore.Http.IHttpContextAccessor _accessor;
+    private readonly TestState _state;
+
+    public AdminService(Microsoft.AspNetCore.Http.IHttpContextAccessor accessor, TestState state)
+    {
+        _accessor = accessor;
+        _state = state;
+    }
+
+    public Task<string> ResetAsync()
+    {
+        Interlocked.Increment(ref _state.Started);
+        return Task.FromResult("reset");
+    }
+
+    public Task<string> WhoAmIAsync() =>
+        Task.FromResult(_accessor.HttpContext?.User.Identity?.Name ?? "anonymous");
 }

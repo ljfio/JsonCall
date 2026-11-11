@@ -1,21 +1,50 @@
-# Jason
+# JsonCall
 
-A simple modular JSON-RPC library for .NET
+Typed, transport-agnostic JSON-RPC 2.0 for .NET 10: one contract interface drives the server, a typed client, streaming
+(`IAsyncEnumerable<T>`) and, in later phases, OpenRPC documentation and generated clients. See [docs/PRD.md](docs/PRD.md).
 
-## Modules
+## Packages
 
-| Serializer      | Package |
-| --------------- | ------- |
-| System JSON     |         |
-| Newtonsoft JSON |         |
-| Cbor            |         |
-| Messagepack     |         |
+| Package | What it is |
+| --- | --- |
+| `JsonCall.Core` | Message model, `IMessageTransport`, `IMessageSerializer`, contract attributes, and `JsonRpcPeer` (correlated calls, notifications, batches, streams) |
+| `JsonCall.Client` | `JsonRpcClient` and the `DispatchProxy` typed proxy |
+| `JsonCall.Server` | Dispatcher: method table, parameter binding, error mapping, stream producers |
+| `JsonCall.Transport` | WebSocket, TCP, stdio (Content-Length framing) and HTTP (with SSE streaming) transports |
+| `JsonCall.Serializer.Cbor`, `JsonCall.Serializer.MessagePack` | Binary wire formats (JSON is built in) |
+| `JsonCall.AspNetCore` | `AddJsonRpc` and `MapJsonRpc`: HTTP POST, SSE and WebSocket on one route |
 
+## Quick start
 
-| Clients      | Package |
-| ------------ | ------- |
-| Websocket    |         |
-| Command Line |         |
+```csharp
+[JsonRpcContract]
+public interface IMath
+{
+    Task<int> AddAsync(int a, int b, CancellationToken ct = default);   // wire name "add"
+}
+
+public interface IEvents
+{
+    IAsyncEnumerable<Tick> TicksAsync(int count, CancellationToken ct); // streamed
+}
+```
+
+Server (ASP.NET Core):
+
+```csharp
+builder.Services.AddJsonRpc(o => o.AddContract<IMath, MathService>());
+app.MapJsonRpc("/rpc");                // POST, SSE and WebSocket on /rpc
+```
+
+Client, over any transport:
+
+```csharp
+var transport = await WebSocketMessageTransport.ConnectAsync(new Uri("ws://localhost:5000/rpc"));
+await using var client = new JsonRpcClient(transport);
+var math = client.CreateProxy<IMath>();
+var sum = await math.AddAsync(1, 2);
+```
+
 ## Specifications
 
 Acceptance criteria live in [`specs/features`](specs/features) as Gherkin and run via Reqnroll + xUnit in `test/JsonCall.Specs`.

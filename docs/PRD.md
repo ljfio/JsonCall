@@ -56,6 +56,10 @@ The existing prototype (`JsonCall`) proves the serializer split but has: a clien
 
 Transport owns **framing**: WebSocket and SSE are already message-oriented; TCP and stdio use `Content-Length` header framing by default (newline-delimited selectable). The core only ever sees whole messages.
 
+> **Implementation note.** The transports ship in a single `JsonCall.Transport` package rather than four, and
+> wire formats are JSON-model transcoders (`IMessageSerializer` converts wire bytes to and from canonical JSON), so the
+> protocol layer is serializer-independent. `JsonCall.Core` also contains the correlating `JsonRpcPeer`.
+
 ## 6. Functional requirements
 
 IDs are referenced from feature-file tags (`@FR-xxx`) so every requirement is traceable to executable scenarios.
@@ -142,10 +146,10 @@ IDs are referenced from feature-file tags (`@FR-xxx`) so every requirement is tr
 
 | Phase | Scope | Exit criteria |
 |---|---|---|
-| 0. Foundation | Repo on .NET 10 (done), rename, Reqnroll harness, CI, rename packages | Harness runs a trivial feature in CI |
-| 1. Core + client | Protocol model, serializers, `IMessageTransport`, WebSocket/TCP/stdio, correlating client | `01`-`04` features green |
-| 2. Server + hosting | Dispatcher, `JsonCall.AspNetCore`, HTTP/WS, typed proxy | `03`, `06` green |
-| 3. Streaming | SSE and `$/stream` convention, client consumption, cleanup | `05` green, D2 ratified |
+| 0. Foundation (done) | Repo on .NET 10 (done), rename, Reqnroll harness, CI, rename packages | Harness runs a trivial feature in CI |
+| 1. Core + client (done) | Protocol model, serializers, `IMessageTransport`, WebSocket/TCP/stdio, correlating client | `01`-`04` features green |
+| 2. Server + hosting (done) | Dispatcher, `JsonCall.AspNetCore`, HTTP/WS, typed proxy | `03`, `06` green |
+| 3. Streaming (done, D2 still draft) | SSE and `$/stream` convention, client consumption, cleanup | `05` green, D2 ratified |
 | 4. OpenRPC out | Generator, `rpc.discover`, meta-schema validation | `07` green |
 | 5. OpenRPC in | Source generator and CLI | `08` green, round-trip proven |
 

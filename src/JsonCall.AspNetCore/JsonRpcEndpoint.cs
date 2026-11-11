@@ -133,15 +133,12 @@ internal sealed class JsonRpcEndpoint
             var acceptsStream = context.Request.GetTypedHeaders().Accept
                 .Any(a => a.MediaType.Equals("text/event-stream", StringComparison.OrdinalIgnoreCase));
 
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(
-                context.RequestAborted, _lifetime.ApplicationStopping);
-
             var result = await JsonRpcRequestProcessor.ProcessAsync(
                 document.RootElement,
                 _server,
                 request =>
                 {
-                    var call = new JsonRpcCallContext(request, linked.Token) { Services = context.RequestServices };
+                    var call = new JsonRpcCallContext(request, context.RequestAborted) { Services = context.RequestServices };
                     call.Items[JsonRpcHttp.HttpContextKey] = context;
                     return call;
                 },
@@ -149,7 +146,11 @@ internal sealed class JsonRpcEndpoint
 
             if (result.Stream is { } stream)
             {
-                await WriteEventStreamAsync(context, stream, linked.Token).ConfigureAwait(false);
+                // In-flight calls run to completion on shutdown; streams are ended.
+                using var streamToken = CancellationTokenSource.CreateLinkedTokenSource(
+                    stream.Context.CancellationToken, _lifetime.ApplicationStopping);
+
+                await WriteEventStreamAsync(context, stream, streamToken.Token).ConfigureAwait(false);
                 return;
             }
 

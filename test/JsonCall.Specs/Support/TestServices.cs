@@ -102,6 +102,12 @@ public sealed class TestState
 
     public TaskCompletionSource DelayCancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    public TaskCompletionSource SlowCancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public List<Guid> ScopeIds { get; } = new();
+
+    public int ScopesDisposed;
+
     public int FailCode { get; set; } = 1001;
 
     public int? AddErrorCode { get; set; }
@@ -118,6 +124,7 @@ public sealed class TestState
     public readonly TaskCompletionSource FirstItemSent = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public readonly List<string> Subscriptions = new();
     public int Started;
+    public int SubscribeCount;
 
     // protocol
     public Action? SumBehavior { get; set; }
@@ -158,7 +165,16 @@ public sealed class TestService : ITestService, IMath, IGreeter, IEvents, IProto
 
     public async Task<int> SlowAsync(CancellationToken ct)
     {
-        await Task.Delay(Timeout.Infinite, ct).ConfigureAwait(false);
+        try
+        {
+            await Task.Delay(Timeout.Infinite, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            _state.SlowCancelled.TrySetResult();
+            throw;
+        }
+
         return 0;
     }
 
@@ -214,6 +230,8 @@ public sealed class TestService : ITestService, IMath, IGreeter, IEvents, IProto
     {
         lock (_state.Subscriptions)
             _state.Subscriptions.Add(topic);
+
+        Interlocked.Increment(ref _state.SubscribeCount);
 
         try
         {
@@ -288,4 +306,68 @@ public sealed class TestService : ITestService, IMath, IGreeter, IEvents, IProto
         lock (_state.Hellos)
             _state.Hellos.Add(value);
     }
+}
+
+
+public interface ICallContext
+{
+    Guid Id { get; }
+}
+
+public sealed class CallContext : ICallContext, IDisposable
+{
+    private readonly TestState _state;
+
+    public CallContext(TestState state) => _state = state;
+
+    public Guid Id { get; } = Guid.NewGuid();
+
+    public void Dispose() => Interlocked.Increment(ref _state.ScopesDisposed);
+}
+
+/// <summary>An implementation resolved from DI, with a scoped dependency.</summary>
+public sealed class MathService : IMath, IGreeter
+{
+    private readonly ICallContext _context;
+    private readonly TestState _state;
+
+    public MathService(ICallContext context, TestState state)
+    {
+        _context = context;
+        _state = state;
+    }
+
+    public async Task<int> AddAsync(int a, int b, CancellationToken ct = default)
+    {
+        lock (_state.ScopeIds)
+            _state.ScopeIds.Add(_context.Id);
+
+        await Task.Delay(50, ct);
+        return a + b;
+    }
+
+    public Task<int> SubtractAsync(int minuend, int subtrahend) => Task.FromResult(minuend - subtrahend);
+
+    public Task LogAsync(string message) => Task.CompletedTask;
+
+    public Task<string> GreetAsync(string name, string greeting = "Hello") => Task.FromResult($"{greeting} {name}");
+}
+
+[JsonRpcContract]
+public interface IMathA
+{
+    [JsonRpcMethod("add")]
+    Task<int> AddAsync(int a, int b);
+}
+
+[JsonRpcContract]
+public interface IMathB
+{
+    [JsonRpcMethod("add")]
+    Task<int> AddAsync(int a, int b);
+}
+
+public sealed class DuplicateMath : IMathA, IMathB
+{
+    public Task<int> AddAsync(int a, int b) => Task.FromResult(a + b);
 }
