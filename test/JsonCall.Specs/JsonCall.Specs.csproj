@@ -6,6 +6,7 @@
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
         <RootNamespace>JsonCall.Specs</RootNamespace>
+        <NoWarn>$(NoWarn);CS8618</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
@@ -19,7 +20,17 @@
     </ItemGroup>
 
     <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\..\src\JsonCall.Core\JsonCall.Core.csproj" />
+        <ProjectReference Include="..\..\src\JsonCall.Client\JsonCall.Client.csproj" />
+        <ProjectReference Include="..\..\src\JsonCall.Server\JsonCall.Server.csproj" />
+        <ProjectReference Include="..\..\src\JsonCall.Transport\JsonCall.Transport.csproj" />
+        <ProjectReference Include="..\..\src\JsonCall.AspNetCore\JsonCall.AspNetCore.csproj" />
+        <ProjectReference Include="..\..\src\JsonCall.Serializer.Cbor\JsonCall.Serializer.Cbor.csproj" />
+        <ProjectReference Include="..\..\src\JsonCall.Serializer.MessagePack\JsonCall.Serializer.MessagePack.csproj" />
     </ItemGroup>
 
     <!--

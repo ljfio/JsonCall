@@ -7,11 +7,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="MessagePack" Version="2.4.35" />
+        <PackageReference Include="MessagePack" Version="3.1.12" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\JsonCall.Core\JsonCall.Core.csproj" />
+        <ProjectReference Include="..\JsonCall.Core\JsonCall.Core.csproj" />
     </ItemGroup>
 
 </Project>

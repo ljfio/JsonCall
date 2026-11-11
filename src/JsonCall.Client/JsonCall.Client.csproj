@@ -7,7 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\JsonCall.Core\JsonCall.Core.csproj" />
+        <ProjectReference Include="..\JsonCall.Core\JsonCall.Core.csproj" />
     </ItemGroup>
 
 </Project>

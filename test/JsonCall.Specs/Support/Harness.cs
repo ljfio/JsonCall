@@ -1,0 +1,461 @@
+using System.IO.Pipelines;
+using System.Net;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Channels;
+using JsonCall.AspNetCore;
+using JsonCall.Client;
+using JsonCall.Core;
+using JsonCall.Core.Model;
+using JsonCall.Core.Protocol;
+using JsonCall.Serializer.Cbor;
+using JsonCall.Serializer.MessagePack;
+using JsonCall.Server;
+using JsonCall.Transport;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace JsonCall.Specs.Support;
+
+public static class Serializers
+{
+    public static IMessageSerializer ByName(string name) => name.ToLowerInvariant() switch
+    {
+        "json" => JsonMessageSerializer.Instance,
+        "cbor" => new CborMessageSerializer(),
+        "messagepack" => new MessagePackMessageSerializer(),
+        _ => throw new ArgumentException($"Unknown serializer '{name}'")
+    };
+
+    public static readonly string[] Names = { "json", "cbor", "messagepack" };
+}
+
+/// <summary>Records everything sent through the wrapped transport.</summary>
+public sealed class RecordingTransport : IMessageTransport
+{
+    private readonly IMessageTransport _inner;
+    private readonly IMessageSerializer _serializer;
+
+    public RecordingTransport(IMessageTransport inner, IMessageSerializer? serializer = null)
+    {
+        _inner = inner;
+        _serializer = serializer ?? JsonMessageSerializer.Instance;
+    }
+
+    public List<byte[]> Sent { get; } = new();
+
+    public List<byte[]> Received { get; } = new();
+
+    public IEnumerable<string> SentJson
+    {
+        get
+        {
+            lock (Sent)
+                return Sent.Select(b => Encoding.UTF8.GetString(_serializer.ToJson(b))).ToList();
+        }
+    }
+
+    public ValueTask SendAsync(ReadOnlyMemory<byte> message, CancellationToken cancellationToken = default)
+    {
+        lock (Sent)
+            Sent.Add(message.ToArray());
+
+        return _inner.SendAsync(message, cancellationToken);
+    }
+
+    public async ValueTask<byte[]?> ReceiveAsync(CancellationToken cancellationToken = default)
+    {
+        var message = await _inner.ReceiveAsync(cancellationToken);
+
+        if (message is not null)
+            lock (Received)
+                Received.Add(message);
+
+        return message;
+    }
+
+    public ValueTask DisposeAsync() => _inner.DisposeAsync();
+}
+
+/// <summary>A hand driven peer that exchanges raw JSON with a server, for protocol conformance tests.</summary>
+public sealed class RawPeer : IAsyncDisposable
+{
+    private readonly IMessageTransport _transport;
+    private readonly IMessageSerializer _serializer;
+    private readonly Channel<string> _messages = Channel.CreateUnbounded<string>();
+    private readonly Task _pump;
+
+    public RawPeer(IMessageTransport transport, IMessageSerializer? serializer = null)
+    {
+        _transport = transport;
+        _serializer = serializer ?? JsonMessageSerializer.Instance;
+        _pump = Task.Run(PumpAsync);
+    }
+
+    public bool Closed { get; private set; }
+
+    public Exception? Failure { get; private set; }
+
+    private async Task PumpAsync()
+    {
+        try
+        {
+            while (await _transport.ReceiveAsync() is { } message)
+                await _messages.Writer.WriteAsync(Encoding.UTF8.GetString(_serializer.ToJson(message)));
+        }
+        catch (Exception ex)
+        {
+            Failure = ex;
+        }
+        finally
+        {
+            Closed = true;
+            _messages.Writer.TryComplete();
+        }
+    }
+
+    public ValueTask SendJsonAsync(string json) => _transport.SendAsync(_serializer.FromJson(Encoding.UTF8.GetBytes(json)));
+
+    public ValueTask SendWireAsync(byte[] wire) => _transport.SendAsync(wire);
+
+    /// <summary>The next received message as JSON text, or null if none arrives within the timeout.</summary>
+    public async Task<string?> NextAsync(TimeSpan? timeout = null)
+    {
+        using var cts = new CancellationTokenSource(timeout ?? TimeSpan.FromSeconds(5));
+
+        try
+        {
+            return await _messages.Reader.ReadAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+        catch (ChannelClosedException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<bool> ReceivesNothingAsync(TimeSpan? window = null) =>
+        await NextAsync(window ?? TimeSpan.FromMilliseconds(250)) is null;
+
+    public async ValueTask DisposeAsync()
+    {
+        await _transport.DisposeAsync();
+        try
+        {
+            await _pump.WaitAsync(TimeSpan.FromSeconds(2));
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+}
+
+/// <summary>A Kestrel host on a loopback port that serves JSON-RPC.</summary>
+public sealed class TestHost : IAsyncDisposable
+{
+    private TestHost(WebApplication app) => App = app;
+
+    public WebApplication App { get; }
+
+    public Uri BaseAddress => new(App.Urls.First());
+
+    public static async Task<TestHost> StartAsync(
+        Action<IServiceCollection> configureServices,
+        Action<WebApplication> configureApp,
+        Action<WebApplicationBuilder>? configureBuilder = null)
+    {
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Logging.ClearProviders();
+        configureBuilder?.Invoke(builder);
+        configureServices(builder.Services);
+
+        var app = builder.Build();
+        configureApp(app);
+
+        try
+        {
+            await app.StartAsync();
+        }
+        catch
+        {
+            await app.DisposeAsync();
+            throw;
+        }
+
+        return new TestHost(app);
+    }
+
+    public static Task<TestHost> StartRpcAsync(TestState state, string path = "/rpc") =>
+        StartAsync(
+            services => services.AddJsonRpc(o => AddContracts(o, state),
+                h => h.AddSerializer("cbor", new CborMessageSerializer()).AddSerializer("messagepack", new MessagePackMessageSerializer())),
+            app => app.MapJsonRpc(path));
+
+    public static void AddContracts(JsonRpcServerOptions options, TestState state)
+    {
+        var service = new TestService(state);
+        options.AddContract<ITestService>(service);
+        options.AddContract<IMath>(service);
+        options.AddContract<IGreeter>(service);
+        options.AddContract<IEvents>(service);
+    }
+
+    public ValueTask DisposeAsync() => App.DisposeAsync();
+}
+
+/// <summary>A connected client plus whatever is needed to reach and kill the server side.</summary>
+public sealed class Connection : IAsyncDisposable
+{
+    private readonly List<Func<ValueTask>> _cleanup = new();
+
+    public required JsonRpcClient Client { get; init; }
+
+    public required RecordingTransport Recording { get; init; }
+
+    public required string TransportName { get; init; }
+
+    public JsonRpcPeer? ServerPeer { get; set; }
+
+    public Func<ValueTask>? KillServer { get; set; }
+
+    public TestHost? Host { get; set; }
+
+    public void OnDispose(Func<ValueTask> cleanup) => _cleanup.Add(cleanup);
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await Client.DisposeAsync();
+        }
+        catch
+        {
+        }
+
+        foreach (var cleanup in Enumerable.Reverse(_cleanup))
+        {
+            try
+            {
+                await cleanup();
+            }
+            catch
+            {
+            }
+        }
+    }
+}
+
+public static class Connections
+{
+    public static JsonRpcServer CreateServer(TestState state, Action<JsonRpcServerOptions>? configure = null)
+    {
+        var options = new JsonRpcServerOptions();
+        TestHost.AddContracts(options, state);
+        configure?.Invoke(options);
+        return new JsonRpcServer(options);
+    }
+
+    public static async Task<Connection> ConnectAsync(string transport, TestState state, string serializerName = "json",
+        IJsonRpcHandler? clientHandler = null, TimeSpan? timeout = null, int clientStreamBuffer = 64)
+    {
+        var serializer = Serializers.ByName(serializerName);
+
+        JsonRpcPeerOptions ClientOptions() => new()
+        {
+            Serializer = serializer,
+            Handler = clientHandler,
+            DefaultTimeout = timeout ?? TimeSpan.FromSeconds(30),
+            StreamBufferSize = clientStreamBuffer
+        };
+
+        switch (transport)
+        {
+            case "in-memory":
+            {
+                var (clientSide, serverSide) = InMemoryTransport.CreatePair();
+                var server = CreateServer(state);
+                var serverPeer = server.Attach(serverSide, serializer);
+                var recording = new RecordingTransport(clientSide, serializer);
+                var client = new JsonRpcClient(recording, ClientOptions());
+
+                return new Connection
+                {
+                    Client = client,
+                    Recording = recording,
+                    TransportName = transport,
+                    ServerPeer = serverPeer,
+                    KillServer = serverPeer.DisposeAsync
+                };
+            }
+
+            case "tcp":
+            {
+                var server = CreateServer(state);
+                var listener = new TcpMessageListener(IPAddress.Loopback, 0);
+                var accepted = new TaskCompletionSource<JsonRpcPeer>();
+                var peers = new List<JsonRpcPeer>();
+                var cts = new CancellationTokenSource();
+
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        while (!cts.IsCancellationRequested)
+                        {
+                            var peer = server.Attach(await listener.AcceptAsync(cts.Token), serializer);
+                            lock (peers)
+                                peers.Add(peer);
+                            accepted.TrySetResult(peer);
+                        }
+                    }
+                    catch
+                    {
+                    }
+                });
+
+                var recording = new RecordingTransport(await TcpMessageTransport.ConnectAsync("127.0.0.1", listener.Port), serializer);
+                var client = new JsonRpcClient(recording, ClientOptions());
+                var serverPeer = await accepted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+                var connection = new Connection
+                {
+                    Client = client,
+                    Recording = recording,
+                    TransportName = transport,
+                    ServerPeer = serverPeer,
+                    KillServer = serverPeer.DisposeAsync
+                };
+
+                connection.OnDispose(async () =>
+                {
+                    cts.Cancel();
+                    listener.Dispose();
+
+                    JsonRpcPeer[] snapshot;
+                    lock (peers)
+                        snapshot = peers.ToArray();
+
+                    foreach (var peer in snapshot)
+                        await peer.DisposeAsync();
+                });
+
+                return connection;
+            }
+
+            case "stdio":
+            {
+                var toServer = new Pipe();
+                var toClient = new Pipe();
+                var server = CreateServer(state);
+
+                var serverTransport = new StreamMessageTransport(toServer.Reader.AsStream(), toClient.Writer.AsStream());
+                var clientTransport = new StreamMessageTransport(toClient.Reader.AsStream(), toServer.Writer.AsStream());
+
+                var serverPeer = server.Attach(serverTransport, serializer);
+                var recording = new RecordingTransport(clientTransport, serializer);
+                var client = new JsonRpcClient(recording, ClientOptions());
+
+                return new Connection
+                {
+                    Client = client,
+                    Recording = recording,
+                    TransportName = transport,
+                    ServerPeer = serverPeer,
+                    KillServer = async () =>
+                    {
+                        await serverPeer.DisposeAsync();
+                        await toClient.Writer.CompleteAsync();
+                    }
+                };
+            }
+
+            case "websocket":
+            {
+                var host = await TestHost.StartRpcAsync(state);
+                var uri = new UriBuilder(host.BaseAddress) { Scheme = "ws", Path = "/rpc" }.Uri;
+
+                var socketTransport = await WebSocketMessageTransport.ConnectAsync(uri, serializer, ws =>
+                {
+                    if (serializerName != "json")
+                        ws.Options.AddSubProtocol("jsoncall." + serializerName);
+                });
+
+                var recording = new RecordingTransport(socketTransport, serializer);
+                var client = new JsonRpcClient(recording, ClientOptions());
+
+                var connection = new Connection
+                {
+                    Client = client,
+                    Recording = recording,
+                    TransportName = transport,
+                    Host = host,
+                    KillServer = async () => await host.App.StopAsync()
+                };
+
+                connection.OnDispose(host.DisposeAsync);
+                return connection;
+            }
+
+            case "http" or "http-sse":
+            {
+                var host = await TestHost.StartRpcAsync(state);
+                var http = new HttpClient { BaseAddress = host.BaseAddress };
+                var httpTransport = new HttpMessageTransport(http, new Uri(host.BaseAddress, "/rpc"), serializer, ownsClient: true);
+                var recording = new RecordingTransport(httpTransport, serializer);
+                var client = new JsonRpcClient(recording, ClientOptions());
+
+                var connection = new Connection
+                {
+                    Client = client,
+                    Recording = recording,
+                    TransportName = transport,
+                    Host = host,
+                    KillServer = async () => await host.App.StopAsync()
+                };
+
+                connection.OnDispose(host.DisposeAsync);
+                return connection;
+            }
+
+            default:
+                throw new ArgumentException($"Unknown transport '{transport}'");
+        }
+    }
+}
+
+public static class Wait
+{
+    public static async Task UntilAsync(Func<bool> condition, TimeSpan? timeout = null, string? message = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(5));
+
+        while (!condition())
+        {
+            if (DateTime.UtcNow > deadline)
+                throw new TimeoutException(message ?? "The condition was not met in time.");
+
+            await Task.Delay(10);
+        }
+    }
+}
+
+/// <summary>Lets a test supply the client's request handler after the client has been created.</summary>
+public sealed class SwappableHandler : IJsonRpcHandler
+{
+    public IJsonRpcHandler? Inner { get; set; }
+
+    public ValueTask<JsonRpcReply?> HandleAsync(JsonRpcRequest request, JsonRpcCallContext context) =>
+        Inner is null
+            ? ValueTask.FromResult<JsonRpcReply?>(request.IsNotification
+                ? null
+                : JsonRpcReply.FromError(JsonRpcErrorCodes.MethodNotFound, "Method not found"))
+            : Inner.HandleAsync(request, context);
+}

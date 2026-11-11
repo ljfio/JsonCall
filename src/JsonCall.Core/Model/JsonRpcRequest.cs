@@ -1,12 +1,23 @@
-using System.Text.Json.Serialization;
+using System.Text.Json;
 
 namespace JsonCall.Core.Model;
 
-public class JsonRpcRequest : JsonRpcObjectBase
+public sealed class JsonRpcRequest
 {
-    [JsonPropertyName("method")]
-    public string Method { get; set; }
+    public JsonRpcRequest(string method, JsonElement? @params, JsonRpcId? id)
+    {
+        Method = method;
+        Params = @params;
+        Id = id;
+    }
 
-    [JsonPropertyName("params")]
-    public JsonRpcParams Params { get; set; }
+    public string Method { get; }
+
+    /// <summary>The structured params (array or object), or null when omitted.</summary>
+    public JsonElement? Params { get; }
+
+    /// <summary>The id, or null for a notification.</summary>
+    public JsonRpcId? Id { get; }
+
+    public bool IsNotification => Id is null;
 }

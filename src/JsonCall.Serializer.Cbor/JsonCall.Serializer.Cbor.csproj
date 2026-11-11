@@ -7,11 +7,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Dahomey.Cbor" Version="1.17.0" />
+        <PackageReference Include="System.Formats.Cbor" Version="10.0.15" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\JsonCall.Core\JsonCall.Core.csproj" />
+        <ProjectReference Include="..\JsonCall.Core\JsonCall.Core.csproj" />
     </ItemGroup>
 
 </Project>

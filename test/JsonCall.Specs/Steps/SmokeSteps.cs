@@ -2,6 +2,8 @@ using System.Text;
 using System.Text.Json;
 using JsonCall.Core;
 using JsonCall.Core.Model;
+using JsonCall.Core.Protocol;
+using JsonCall.Specs.Support;
 using Reqnroll;
 
 namespace JsonCall.Specs.Steps;
@@ -9,32 +11,29 @@ namespace JsonCall.Specs.Steps;
 [Binding]
 public sealed class SmokeSteps
 {
-    private DefaultMessageSerializer? _serializer;
-    private string? _json;
+    private readonly World _world;
 
-    [Given("the default message serializer")]
-    public void GivenTheDefaultMessageSerializer() => _serializer = new DefaultMessageSerializer();
+    public SmokeSteps(World world) => _world = world;
 
-    [When(@"the params ""(.*)"" and (\d+) are serialized by position")]
-    public async Task WhenParamsSerializedByPosition(string text, int number) =>
-        _json = await SerializeAsync(new JsonRpcParams(new object[] { text, number }));
+    [Given("^the default message serializer$")]
+    public void GivenTheDefaultMessageSerializer() => _world.Values["serializer"] = JsonMessageSerializer.Instance;
 
-    [When(@"the params (\{.*\}) are serialized by name")]
-    public async Task WhenParamsSerializedByName(string json)
+    [When(@"^the params ""(.*)"" and (\d+) are serialized by position$")]
+    public void WhenParamsSerializedByPosition(string text, int number) =>
+        _world.Values["json"] = Serialize(JsonRpcParams.ByPosition(text, number));
+
+    [When(@"^the params (\{.*\}) are serialized by name$")]
+    public void WhenParamsSerializedByName(string json)
     {
         var values = JsonSerializer.Deserialize<Dictionary<string, int>>(json)!
-            .ToDictionary(p => p.Key, p => (object)p.Value);
+            .Select(p => new KeyValuePair<string, object?>(p.Key, p.Value));
 
-        _json = await SerializeAsync(new JsonRpcParams(values));
+        _world.Values["json"] = Serialize(JsonRpcParams.ByName(values));
     }
 
-    [Then("the JSON is '(.*)'")]
-    public void ThenTheJsonIs(string expected) => Assert.Equal(expected, _json);
+    [Then("^the JSON is '(.*)'$")]
+    public void ThenTheJsonIs(string expected) => Assert.Equal(expected, _world.Values["json"]);
 
-    private async Task<string> SerializeAsync(JsonRpcParams parameters)
-    {
-        using var stream = new MemoryStream();
-        await _serializer!.SerializeAsync(stream, parameters);
-        return Encoding.UTF8.GetString(stream.ToArray());
-    }
+    private static string Serialize(JsonRpcParams parameters) =>
+        Encoding.UTF8.GetString(JsonRpcWire.Write(w => parameters.Node.WriteTo(w)));
 }

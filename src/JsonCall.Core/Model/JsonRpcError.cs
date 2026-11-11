@@ -1,12 +1,20 @@
-using System.Text.Json.Serialization;
+using System.Text.Json;
 
 namespace JsonCall.Core.Model;
 
-public class JsonRpcError
+/// <summary>The error object of a JSON-RPC response.</summary>
+public sealed class JsonRpcError
 {
-    [JsonPropertyName("code")]
-    public int Code { get; set; }
+    public JsonRpcError(int code, string message, JsonElement? data = null)
+    {
+        Code = code;
+        Message = message;
+        Data = data;
+    }
 
-    [JsonPropertyName("message")]
-    public string Message { get; set; }
+    public int Code { get; }
+
+    public string Message { get; }
+
+    public JsonElement? Data { get; }
 }

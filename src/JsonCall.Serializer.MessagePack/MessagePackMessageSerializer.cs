@@ -1,23 +1,30 @@
+using System.Text;
 using JsonCall.Core;
-using JsonCall.Serializer.MessagePack.Formatters;
+using JsonCall.Core.Model;
 using MessagePack;
-using MessagePack.Formatters;
-using MessagePack.Resolvers;
 
 namespace JsonCall.Serializer.MessagePack;
 
-public class MessagePackMessageSerializer : IMessageSerializer
+/// <summary>MessagePack wire format, transcoded from and to the JSON data model.</summary>
+public sealed class MessagePackMessageSerializer : IMessageSerializer
 {
-    private static readonly MessagePackSerializerOptions Options = MessagePackSerializerOptions.Standard
-        .WithResolver(CompositeResolver.Create(new JsonRpcParamsFormatter()));
+    public string ContentType => "application/msgpack";
 
-    public async Task SerializeAsync<T>(Stream stream, T value, CancellationToken cancellationToken = default)
-    {
-        await MessagePackSerializer.SerializeAsync<T>(stream, value, cancellationToken: cancellationToken);
-    }
+    public bool IsBinary => true;
 
-    public async Task<T> DeserializeAsync<T>(Stream stream, CancellationToken cancellationToken = default)
+    public byte[] FromJson(ReadOnlySpan<byte> json) =>
+        MessagePackSerializer.ConvertFromJson(Encoding.UTF8.GetString(json));
+
+    public byte[] ToJson(ReadOnlySpan<byte> wire)
     {
-        return await MessagePackSerializer.DeserializeAsync<T>(stream, cancellationToken: cancellationToken);
+        try
+        {
+            return Encoding.UTF8.GetBytes(MessagePackSerializer.ConvertToJson(wire.ToArray()));
+        }
+        catch (Exception ex) when (ex is MessagePackSerializationException or InvalidOperationException
+                                       or ArgumentException or EndOfStreamException)
+        {
+            throw new JsonRpcParseException("Malformed MessagePack: " + ex.Message, ex);
+        }
     }
 }
