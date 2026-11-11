@@ -124,6 +124,13 @@ public class JsonRpcPeer : IAsyncDisposable
 
     public JsonSerializerOptions SerializerOptions => _options.SerializerOptions;
 
+    /// <summary>Default timeout for calls that do not specify one.</summary>
+    public TimeSpan DefaultTimeout
+    {
+        get => _options.DefaultTimeout;
+        set => _options.DefaultTimeout = value;
+    }
+
     /// <summary>Completes when the read loop ends (peer closed, transport failed, or disposed).</summary>
     public Task Completion => _completion.Task;
 
@@ -251,6 +258,8 @@ public class JsonRpcPeer : IAsyncDisposable
 
         try
         {
+            ThrowIfConnectionClosed(calls.Select(c => c.Id).ToArray());
+
             await SendJsonAsync(bytes, cancellationToken).ConfigureAwait(false);
 
             if (calls.Count == 0)
@@ -298,6 +307,7 @@ public class JsonRpcPeer : IAsyncDisposable
         var id = JsonRpcId.FromNumber(Interlocked.Increment(ref _nextId));
         var pending = new PendingCall(expectsStream);
         _pending[id] = pending;
+        ThrowIfConnectionClosed(id);
 
         using var timeoutCts = new CancellationTokenSource(timeout ?? _options.DefaultTimeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
@@ -754,6 +764,17 @@ public class JsonRpcPeer : IAsyncDisposable
     }
 
     // ---------------------------------------------------------------- lifetime
+
+    private void ThrowIfConnectionClosed(params JsonRpcId[] ids)
+    {
+        if (!_completion.Task.IsCompleted)
+            return;
+
+        foreach (var id in ids)
+            _pending.TryRemove(id, out _);
+
+        throw new ConnectionLostException("The JSON-RPC connection is closed.");
+    }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
 

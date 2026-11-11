@@ -73,7 +73,7 @@ internal sealed class JsonRpcEndpoint
 
         using var socket = await context.WebSockets.AcceptWebSocketAsync(subProtocol).ConfigureAwait(false);
 
-        var transport = new WebSocketMessageTransport(socket, serializer, _host.MaxRequestBodySize);
+        var transport = new WebSocketMessageTransport(socket, serializer, _host.MaxWebSocketMessageSize);
 
         await using var peer = _server.Attach(transport, serializer,
             o => o.Items[JsonRpcHttp.HttpContextKey] = context);

@@ -49,6 +49,15 @@ public readonly struct JsonRpcParams
         return new JsonRpcParams(obj, JsonRpcParamsType.ByName);
     }
 
+    /// <summary>Wraps raw JSON that must be an array (by position) or an object (by name).</summary>
+    public static JsonRpcParams FromJson(string json) =>
+        JsonNode.Parse(json) switch
+        {
+            JsonArray array => new JsonRpcParams(array, JsonRpcParamsType.ByPosition),
+            JsonObject obj => new JsonRpcParams(obj, JsonRpcParamsType.ByName),
+            _ => throw new ArgumentException("Params must be a JSON array or object.", nameof(json))
+        };
+
     /// <summary>A single value becomes a one element positional array.</summary>
     public static JsonRpcParams Single(object? value) => ByPosition(value);
 

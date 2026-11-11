@@ -21,6 +21,9 @@ public sealed class JsonRpcHostOptions
 
     public IReadOnlyDictionary<string, IMessageSerializer> Serializers => _serializers;
 
+    /// <summary>Largest accepted WebSocket message.</summary>
+    public int MaxWebSocketMessageSize { get; set; } = 64 * 1024 * 1024;
+
     /// <summary>Largest accepted HTTP request body.</summary>
     public int MaxRequestBodySize { get; set; } = 4 * 1024 * 1024;
 

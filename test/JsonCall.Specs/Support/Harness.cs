@@ -228,6 +228,10 @@ public sealed class Connection : IAsyncDisposable
 
     public TestHost? Host { get; set; }
 
+    public int ServerPort { get; set; }
+
+    public IMessageTransport? InnerTransport { get; set; }
+
     public void OnDispose(Func<ValueTask> cleanup) => _cleanup.Add(cleanup);
 
     public async ValueTask DisposeAsync()
@@ -331,6 +335,7 @@ public static class Connections
                     Recording = recording,
                     TransportName = transport,
                     ServerPeer = serverPeer,
+                    ServerPort = listener.Port,
                     KillServer = serverPeer.DisposeAsync
                 };
 
@@ -397,6 +402,7 @@ public static class Connections
                     Recording = recording,
                     TransportName = transport,
                     Host = host,
+                    InnerTransport = socketTransport,
                     KillServer = async () => await host.App.StopAsync()
                 };
 
@@ -458,4 +464,116 @@ public sealed class SwappableHandler : IJsonRpcHandler
                 ? null
                 : JsonRpcReply.FromError(JsonRpcErrorCodes.MethodNotFound, "Method not found"))
             : Inner.HandleAsync(request, context);
+}
+
+
+/// <summary>Forwards TCP traffic one byte at a time in both directions.</summary>
+public sealed class DribbleProxy : IAsyncDisposable
+{
+    private readonly System.Net.Sockets.TcpListener _listener;
+    private readonly CancellationTokenSource _cts = new();
+
+    public DribbleProxy(int targetPort)
+    {
+        _listener = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+        _listener.Start();
+        Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!_cts.IsCancellationRequested)
+                {
+                    var inbound = await _listener.AcceptTcpClientAsync(_cts.Token);
+                    var outbound = new System.Net.Sockets.TcpClient { NoDelay = true };
+                    await outbound.ConnectAsync(IPAddress.Loopback, targetPort, _cts.Token);
+                    inbound.NoDelay = true;
+                    _ = PumpAsync(inbound, outbound);
+                    _ = PumpAsync(outbound, inbound);
+                }
+            }
+            catch
+            {
+            }
+        });
+    }
+
+    public int Port { get; }
+
+    private async Task PumpAsync(System.Net.Sockets.TcpClient from, System.Net.Sockets.TcpClient to)
+    {
+        try
+        {
+            var source = from.GetStream();
+            var target = to.GetStream();
+            var buffer = new byte[4096];
+            int read;
+
+            while ((read = await source.ReadAsync(buffer, _cts.Token)) > 0)
+            {
+                for (var i = 0; i < read; i++)
+                {
+                    await target.WriteAsync(buffer.AsMemory(i, 1), _cts.Token);
+                    await target.FlushAsync(_cts.Token);
+                }
+            }
+        }
+        catch
+        {
+        }
+        finally
+        {
+            from.Dispose();
+            to.Dispose();
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _cts.Cancel();
+        _listener.Stop();
+        return ValueTask.CompletedTask;
+    }
+}
+
+/// <summary>A user written transport (not one of the library's) used to prove the seam is open.</summary>
+public sealed class ChannelTransport : IMessageTransport
+{
+    private readonly System.Threading.Channels.ChannelReader<byte[]> _reader;
+    private readonly System.Threading.Channels.ChannelWriter<byte[]> _writer;
+
+    public ChannelTransport(System.Threading.Channels.ChannelReader<byte[]> reader, System.Threading.Channels.ChannelWriter<byte[]> writer)
+    {
+        _reader = reader;
+        _writer = writer;
+    }
+
+    public static (ChannelTransport A, ChannelTransport B) Pair()
+    {
+        var ab = System.Threading.Channels.Channel.CreateUnbounded<byte[]>();
+        var ba = System.Threading.Channels.Channel.CreateUnbounded<byte[]>();
+        return (new ChannelTransport(ba.Reader, ab.Writer), new ChannelTransport(ab.Reader, ba.Writer));
+    }
+
+    public ValueTask SendAsync(ReadOnlyMemory<byte> message, CancellationToken cancellationToken = default) =>
+        _writer.WriteAsync(message.ToArray(), cancellationToken);
+
+    public async ValueTask<byte[]?> ReceiveAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await _reader.ReadAsync(cancellationToken);
+        }
+        catch (System.Threading.Channels.ChannelClosedException)
+        {
+            return null;
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _writer.TryComplete();
+        return ValueTask.CompletedTask;
+    }
 }

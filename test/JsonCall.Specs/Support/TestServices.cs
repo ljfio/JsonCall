@@ -100,6 +100,8 @@ public sealed class TestState
 
     public TaskCompletionSource ReleaseGate { get; set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    public TaskCompletionSource DelayCancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     public int FailCode { get; set; } = 1001;
 
     public int? AddErrorCode { get; set; }
@@ -135,10 +137,19 @@ public sealed class TestService : ITestService, IMath, IGreeter, IEvents, IProto
     {
         var delay = _state.Delays.TryGetValue(value, out var d) ? d : _state.DefaultDelay;
 
-        if (delay > TimeSpan.Zero)
-            await Task.WhenAny(Task.Delay(delay, ct), _state.ReleaseGate.Task).ConfigureAwait(false);
+        try
+        {
+            if (delay > TimeSpan.Zero)
+                await Task.WhenAny(Task.Delay(delay, ct), _state.ReleaseGate.Task).ConfigureAwait(false);
 
-        ct.ThrowIfCancellationRequested();
+            ct.ThrowIfCancellationRequested();
+        }
+        catch (OperationCanceledException)
+        {
+            _state.DelayCancelled.TrySetResult();
+            throw;
+        }
+
         return value;
     }
 

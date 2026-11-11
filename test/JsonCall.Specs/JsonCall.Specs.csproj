@@ -33,6 +33,10 @@
         <ProjectReference Include="..\..\src\JsonCall.Serializer.MessagePack\JsonCall.Serializer.MessagePack.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <None Include="Support\echo_server.py" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
     <!--
       The feature files live in /specs/features and are linked in here.
       Features without step definitions yet are reported as Skipped (see reqnroll.json),
