@@ -94,6 +94,9 @@ public interface IAdmin
 /// <summary>Shared, observable state behind the test contracts.</summary>
 public sealed class TestState
 {
+    /// <summary>Extra server configuration applied by every test server and host (e.g. OpenRPC discovery).</summary>
+    public Action<JsonCall.Server.JsonRpcServerOptions>? ConfigureServer { get; set; }
+
     public TimeSpan DefaultDelay { get; set; } = TimeSpan.Zero;
 
     public Dictionary<string, TimeSpan> Delays { get; } = new();

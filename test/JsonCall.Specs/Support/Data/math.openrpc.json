@@ -1,0 +1,175 @@
+{
+  "openrpc": "1.3.2",
+  "info": {
+    "title": "Math API",
+    "version": "1.2.0"
+  },
+  "methods": [
+    {
+      "name": "add",
+      "summary": "Adds two numbers.",
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "a",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": "First addend."
+        },
+        {
+          "name": "b",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": "Second addend."
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    {
+      "name": "greet",
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "greeting",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "default": "Hello"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "name": "plus",
+      "description": "Obsolete: Use AddAsync",
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "a",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        {
+          "name": "b",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "deprecated": true
+    },
+    {
+      "name": "log",
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "message",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    {
+      "name": "getPerson",
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "id",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/Person"
+        }
+      }
+    },
+    {
+      "name": "listPeople",
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "filter",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/Person"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Person"
+          }
+        }
+      }
+    }
+  ],
+  "components": {
+    "schemas": {
+      "Person": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "age": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": [
+          "name",
+          "age"
+        ]
+      }
+    }
+  }
+}

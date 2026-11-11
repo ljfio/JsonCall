@@ -37,9 +37,14 @@ public sealed class JsonRpcServer : IJsonRpcHandler
             RegisterContract(registration);
 
         foreach (var registration in options.Delegates)
-            Register(new RegisteredMethod(
-                WithName(ContractReflection.Describe(registration.Handler.Method), registration.Name),
-                "delegate '" + registration.Name + "'", null, null, null, registration.Handler));
+            Register(
+                new RegisteredMethod(
+                    WithName(ContractReflection.Describe(registration.Handler.Method), registration.Name),
+                    "delegate '" + registration.Name + "'", null, null, null, registration.Handler)
+                {
+                    Metadata = registration.Metadata ?? Array.Empty<object>()
+                },
+                registration.AllowReserved);
     }
 
     public IReadOnlyCollection<RegisteredMethod> Methods => _methods.Values;
@@ -73,9 +78,10 @@ public sealed class JsonRpcServer : IJsonRpcHandler
         }
     }
 
-    private void Register(RegisteredMethod method)
+    private void Register(RegisteredMethod method, bool allowReserved = false)
     {
-        _options.EnsureNotReserved(method.Name);
+        if (!allowReserved)
+            _options.EnsureNotReserved(method.Name);
 
         if (_methods.TryGetValue(method.Name, out var existing))
         {

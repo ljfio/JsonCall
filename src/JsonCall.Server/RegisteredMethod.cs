@@ -28,6 +28,8 @@ public sealed class RegisteredMethod
 
     public Type? ImplementationType { get; }
 
+    internal IReadOnlyList<object> Metadata { get; init; } = Array.Empty<object>();
+
     internal object? Instance { get; }
 
     internal Delegate? Delegate { get; }
@@ -37,7 +39,7 @@ public sealed class RegisteredMethod
     /// <summary>Attributes on the method, its contract and (when known) the implementation. Used for authorization.</summary>
     public IEnumerable<object> GetAttributes()
     {
-        var result = new List<object>();
+        var result = new List<object>(Metadata);
 
         result.AddRange(Description.Method.GetCustomAttributes(inherit: true));
 

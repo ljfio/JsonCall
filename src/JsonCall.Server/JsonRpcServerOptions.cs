@@ -13,7 +13,8 @@ public interface IJsonRpcCallFilter
 
 public sealed record ContractRegistration(Type Contract, Type? Implementation, object? Instance);
 
-public sealed record DelegateRegistration(string Name, Delegate Handler);
+public sealed record DelegateRegistration(string Name, Delegate Handler, IReadOnlyList<object>? Metadata = null,
+    bool AllowReserved = false);
 
 public sealed class JsonRpcServerOptions
 {
@@ -61,6 +62,16 @@ public sealed class JsonRpcServerOptions
     {
         EnsureNotReserved(name);
         _delegates.Add(new DelegateRegistration(name, handler));
+        return this;
+    }
+
+    /// <summary>
+    /// Registers a method in the reserved "rpc." namespace. Intended for library modules such as OpenRPC discovery.
+    /// <paramref name="metadata"/> (for example an <c>AuthorizeAttribute</c>) is treated like attributes on the method.
+    /// </summary>
+    public JsonRpcServerOptions AddReservedMethod(string name, Delegate handler, IEnumerable<object>? metadata = null)
+    {
+        _delegates.Add(new DelegateRegistration(name, handler, metadata?.ToArray(), AllowReserved: true));
         return this;
     }
 

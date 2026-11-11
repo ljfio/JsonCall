@@ -71,6 +71,8 @@ public sealed class HostSpec
 
                         foreach (var contract in Contracts)
                             contract(options);
+
+                        state.ConfigureServer?.Invoke(options);
                     },
                     host => host.AddSerializer("cbor", new CborMessageSerializer())
                         .AddSerializer("messagepack", new MessagePackMessageSerializer()));

@@ -3,7 +3,12 @@ namespace JsonCall.Core;
 public enum JsonRpcParamStyle
 {
     ByPosition,
-    ByName
+    ByName,
+
+    /// <summary>
+    /// Documents that both styles are accepted (OpenRPC "either"). The proxy sends params by position.
+    /// </summary>
+    Either
 }
 
 /// <summary>Marks an interface as a JSON-RPC contract.</summary>
@@ -31,4 +36,28 @@ public sealed class JsonRpcMethodAttribute : Attribute
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class JsonRpcNotificationAttribute : Attribute
 {
+}
+
+/// <summary>Documents an application error a method can return (OpenRPC <c>errors</c>).</summary>
+[AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
+public sealed class JsonRpcErrorAttribute : Attribute
+{
+    public JsonRpcErrorAttribute(int code, string message)
+    {
+        Code = code;
+        Message = message;
+    }
+
+    public int Code { get; }
+
+    public string Message { get; }
+}
+
+/// <summary>Adds an OpenRPC tag to a method, or to every method of a contract.</summary>
+[AttributeUsage(AttributeTargets.Interface | AttributeTargets.Method, AllowMultiple = true)]
+public sealed class JsonRpcTagAttribute : Attribute
+{
+    public JsonRpcTagAttribute(string name) => Name = name;
+
+    public string Name { get; }
 }

@@ -230,6 +230,7 @@ public sealed class TestHost : IAsyncDisposable
         options.AddContract<IMath>(service);
         options.AddContract<IGreeter>(service);
         options.AddContract<IEvents>(service);
+        state.ConfigureServer?.Invoke(options);
     }
 
     public ValueTask DisposeAsync() => App.DisposeAsync();

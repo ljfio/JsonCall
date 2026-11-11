@@ -6,13 +6,16 @@
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
         <RootNamespace>JsonCall.Specs</RootNamespace>
-        <NoWarn>$(NoWarn);CS8618</NoWarn>
+        <NoWarn>$(NoWarn);CS8618;CS1591</NoWarn>
+        <!-- The OpenRPC specs read summaries from the XML documentation file next to this assembly. -->
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
         <PackageReference Include="Reqnroll.xUnit" Version="3.3.4" />
         <PackageReference Include="xunit" Version="2.9.3" />
+        <PackageReference Include="JsonSchema.Net" Version="7.3.4" />
         <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
@@ -27,6 +30,7 @@
         <ProjectReference Include="..\..\src\JsonCall.Core\JsonCall.Core.csproj" />
         <ProjectReference Include="..\..\src\JsonCall.Client\JsonCall.Client.csproj" />
         <ProjectReference Include="..\..\src\JsonCall.Server\JsonCall.Server.csproj" />
+        <ProjectReference Include="..\..\src\JsonCall.OpenRpc\JsonCall.OpenRpc.csproj" />
         <ProjectReference Include="..\..\src\JsonCall.Transport\JsonCall.Transport.csproj" />
         <ProjectReference Include="..\..\src\JsonCall.AspNetCore\JsonCall.AspNetCore.csproj" />
         <ProjectReference Include="..\..\src\JsonCall.Serializer.Cbor\JsonCall.Serializer.Cbor.csproj" />
@@ -35,6 +39,7 @@
 
     <ItemGroup>
         <None Include="Support\echo_server.py" CopyToOutputDirectory="PreserveNewest" />
+        <None Include="Support\Data\*.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
     <!--
