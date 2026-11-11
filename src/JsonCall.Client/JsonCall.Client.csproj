@@ -4,6 +4,8 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <Description>Typed JSON-RPC 2.0 client for .NET: JsonRpcClient and a DispatchProxy that turns a contract interface into a client, with transport- and serializer-agnostic calls, notifications and IAsyncEnumerable streaming.</Description>
+        <PackageTags>$(PackageTags);client;proxy</PackageTags>
     </PropertyGroup>
 
     <ItemGroup>

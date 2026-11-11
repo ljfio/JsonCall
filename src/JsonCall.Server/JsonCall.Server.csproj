@@ -4,6 +4,8 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <Description>JSON-RPC 2.0 server dispatcher for .NET: method table built from contract interfaces, parameter binding, error mapping and IAsyncEnumerable stream producers.</Description>
+        <PackageTags>$(PackageTags);server;dispatcher</PackageTags>
     </PropertyGroup>
 
     <ItemGroup>

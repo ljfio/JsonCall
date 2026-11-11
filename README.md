@@ -1,7 +1,7 @@
 # JsonCall
 
 Typed, transport-agnostic JSON-RPC 2.0 for .NET 10: one contract interface drives the server, a typed client, streaming
-(`IAsyncEnumerable<T>`) and, in later phases, OpenRPC documentation and generated clients. See [docs/PRD.md](docs/PRD.md).
+(`IAsyncEnumerable<T>`), OpenRPC documentation and generated clients. See [docs/PRD.md](docs/PRD.md).
 
 ## Packages
 

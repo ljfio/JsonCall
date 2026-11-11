@@ -1,0 +1,19 @@
+<Project>
+
+    <!-- Metadata shared by every package. Each project sets its own Description. -->
+    <PropertyGroup>
+        <Authors>Luke Fisher</Authors>
+        <Copyright>Copyright (c) 2023 Luke Fisher</Copyright>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/ljfio/JsonCall</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/ljfio/JsonCall</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageTags>jsonrpc;json-rpc;json-rpc-2.0;openrpc;rpc;jsoncall</PackageTags>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(IsPackable)' != 'false'">
+        <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Visible="false" />
+    </ItemGroup>
+
+</Project>

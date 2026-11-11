@@ -4,6 +4,8 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <Description>JSON-RPC 2.0 hosting for ASP.NET Core: AddJsonRpc and MapJsonRpc expose HTTP POST (single and batch), Server-Sent Events and WebSocket on one route, with dependency injection per call and the usual endpoint conventions (auth, CORS, rate limiting).</Description>
+        <PackageTags>$(PackageTags);aspnetcore;sse;websocket</PackageTags>
     </PropertyGroup>
 
     <ItemGroup>

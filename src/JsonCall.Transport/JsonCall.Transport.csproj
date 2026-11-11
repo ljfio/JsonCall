@@ -4,6 +4,8 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <Description>Interchangeable JSON-RPC 2.0 transports for JsonCall: WebSocket, TCP, stdio (Content-Length framing) and HTTP with Server-Sent Events streaming.</Description>
+        <PackageTags>$(PackageTags);transport;websocket;tcp;stdio;sse</PackageTags>
     </PropertyGroup>
 
     <ItemGroup>

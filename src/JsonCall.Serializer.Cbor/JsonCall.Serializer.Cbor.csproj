@@ -4,6 +4,8 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <Description>CBOR message serializer for JsonCall, a compact binary wire format for JSON-RPC 2.0.</Description>
+        <PackageTags>$(PackageTags);cbor;serializer</PackageTags>
     </PropertyGroup>
 
     <ItemGroup>

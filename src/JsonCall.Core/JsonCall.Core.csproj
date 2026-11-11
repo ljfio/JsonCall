@@ -4,6 +4,8 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <Description>Core of JsonCall, a JSON-RPC 2.0 library for .NET: the message model, IMessageTransport and IMessageSerializer abstractions, contract attributes and JsonRpcPeer (correlated calls, notifications, batches and streams).</Description>
+        <PackageTags>$(PackageTags);protocol</PackageTags>
     </PropertyGroup>
 
 </Project>

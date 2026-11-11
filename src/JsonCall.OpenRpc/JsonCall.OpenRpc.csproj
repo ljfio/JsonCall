@@ -4,6 +4,8 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <Description>Generates an OpenRPC 1.3.2 document (Draft 07 schemas, XML doc comments) from JSON-RPC contracts and serves it through rpc.discover.</Description>
+        <PackageTags>$(PackageTags);openapi;discovery;documentation</PackageTags>
     </PropertyGroup>
 
     <ItemGroup>

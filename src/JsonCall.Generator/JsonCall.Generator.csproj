@@ -10,6 +10,8 @@
         <IncludeBuildOutput>false</IncludeBuildOutput>
         <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
         <NoWarn>$(NoWarn);RS1036</NoWarn>
+        <Description>Roslyn source generator that reads an OpenRPC document (*.openrpc.json AdditionalFiles) and emits typed DTOs, a contract interface and a JSON-RPC client class at build time. Output is deterministic and AOT-friendly.</Description>
+        <PackageTags>$(PackageTags);sourcegenerator;codegen;analyzers</PackageTags>
     </PropertyGroup>
 
     <ItemGroup>
