@@ -13,5 +13,6 @@
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="test/JsonCall.Core.Tests.Unit/JsonCall.Core.Tests.Unit.csproj" />
+    <Project Path="test/JsonCall.Specs/JsonCall.Specs.csproj" />
   </Folder>
 </Solution>
