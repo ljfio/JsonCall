@@ -78,8 +78,27 @@ document's directory. A source generator can only see `AdditionalFiles`, so add 
 <AdditionalFiles Include="lsp/diagnostic.schema.json" />
 ```
 
-Pushed notifications are not part of the generated client's surface: a generated `...Async` method is a call. Consume
-notifications with `peer.OnNotification("event", ...)` on the `JsonRpcPeer` the client wraps.
+### Pushed notifications
+
+A generated method with no result (for example `EventAsync`) is a **call** that sends a notification to the
+server. It is not a subscription. To receive notifications the server pushes, register a handler on the peer
+the client wraps:
+
+```csharp
+peer.OnNotification<Event>("event", e => Console.WriteLine(e));
+```
+
+## Broadcasting from a daemon
+
+`JsonRpcServer.Attach` returns an untracked peer. `JsonRpcConnectionSet` tracks the peers, drops them when
+their connection ends, and broadcasts notifications:
+
+```csharp
+var connections = new JsonRpcConnectionSet();
+connections.Attach(server, transport);                       // per accepted connection
+await connections.BroadcastAsync("event", JsonRpcParams.Single(payload));
+await connections.BroadcastAsync("event", JsonRpcParams.Single(payload), filter: p => IsSubscribed(p));
+```
 
 ## Stream transports and framing
 
