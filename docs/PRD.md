@@ -1,6 +1,8 @@
 # PRD: JsonCall — a typed, transport-agnostic JSON-RPC 2.0 toolkit for .NET
 
-Status: Draft v0.1 · Name: **JsonCall** (see §12)
+Status: phases 0 to 6 implemented · Name: **JsonCall** (see §12)
+This is the design record. For how to use the library see the [README](../README.md); for known issues and what
+comes next see the [roadmap](ROADMAP.md), which also records where the implementation falls short of §7.
 Target framework: **.NET 10** (C# 14) · Acceptance specs: `specs/features/*.feature`
 
 ## 1. Problem

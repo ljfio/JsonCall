@@ -12,6 +12,33 @@
         <PackageTags>jsonrpc;json-rpc;json-rpc-2.0;openrpc;rpc;jsoncall</PackageTags>
     </PropertyGroup>
 
+    <!--
+      Version. Pre-release until the items under "Before 1.0" in docs/ROADMAP.md are closed: the streaming wire
+      convention is still a draft and the public API is not frozen. -p:VersionSuffix=preview.2 overrides the suffix;
+      delete the VersionSuffix line to cut a stable release.
+    -->
+    <PropertyGroup>
+        <VersionPrefix>0.1.0</VersionPrefix>
+        <VersionSuffix>preview.1</VersionSuffix>
+    </PropertyGroup>
+
+    <!-- Source Link, embedded symbols and reproducible builds, so consumers can step into the library. -->
+    <PropertyGroup>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <DebugType>embedded</DebugType>
+        <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    </PropertyGroup>
+
+    <!--
+      Projects under src/ ship their XML documentation, so IntelliSense shows it. CS1591 (public member without
+      documentation) stays off until the backlog in docs/ROADMAP.md is cleared; then remove the NoWarn.
+    -->
+    <PropertyGroup Condition="$(MSBuildProjectDirectory.Replace('\', '/').Contains('/src/'))">
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+    </PropertyGroup>
+
     <ItemGroup Condition="'$(IsPackable)' != 'false'">
         <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Visible="false" />
     </ItemGroup>

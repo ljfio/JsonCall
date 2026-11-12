@@ -1,126 +1,159 @@
 # JsonCall
 
-Typed, transport-agnostic JSON-RPC 2.0 for .NET 10: one contract interface drives the server, a typed client, streaming
-(`IAsyncEnumerable<T>`), OpenRPC documentation and generated clients. See [docs/PRD.md](docs/PRD.md).
+Typed, transport-agnostic JSON-RPC 2.0 for .NET, with OpenRPC in both directions.
 
-## Packages
+One C# interface drives the server, a typed client, `IAsyncEnumerable<T>` streaming and an OpenRPC document.
+An OpenRPC document, yours or someone else's, becomes a typed C# client at build time.
+
+> **Status: preview (0.1).** The JSON-RPC core is covered by 274 executable specifications. The streaming wire
+> convention is a draft and the public API is not frozen. See the [roadmap](https://github.com/ljfio/JsonCall/blob/main/docs/ROADMAP.md) for what stands
+> between this and 1.0.
+
+## What you get
+
+- **JSON-RPC 2.0, complete**: requests, notifications, batches, by-name and by-position params, standard error codes,
+  concurrent correlated calls, cancellation and timeouts, calls in both directions on one connection.
+- **Any transport**: WebSocket, TCP, Unix domain sockets, stdio (child process or console) and HTTP. Content-Length
+  (LSP style) or newline framing on byte streams.
+- **Any wire format**: JSON built in; CBOR and MessagePack as add-on packages.
+- **ASP.NET Core hosting**: `MapJsonRpc("/rpc")` serves HTTP POST, Server-Sent Events and WebSocket on one route, with
+  dependency injection per call and `[Authorize]` on contracts and methods.
+- **Streaming**: a contract method that returns `IAsyncEnumerable<T>` streams over every transport, with
+  back-pressure and cancellation.
+- **OpenRPC out**: a document generated from your contracts (Draft 07 schemas, XML doc comments), served on
+  `rpc.discover`.
+- **OpenRPC in**: a Roslyn source generator and the `jsoncall` tool turn an OpenRPC document into records, an
+  interface and a client class.
+
+## Install
+
+Requires .NET 10.
+
+| You are writing | Packages |
+| --- | --- |
+| An ASP.NET Core service | `JsonCall.AspNetCore` (add `JsonCall.OpenRpc` for `rpc.discover`) |
+| A client for a contract you share with the server | `JsonCall.Client`, `JsonCall.Transport` |
+| A client from an OpenRPC document | `JsonCall.Client`, `JsonCall.Transport`, `JsonCall.Generator` |
+| A stdio, TCP or Unix socket server (a daemon, a language server) | `JsonCall.Server`, `JsonCall.Transport` |
+
+```sh
+dotnet add package JsonCall.AspNetCore --prerelease
+```
+
+All packages:
 
 | Package | What it is |
 | --- | --- |
-| `JsonCall.Core` | Message model, `IMessageTransport`, `IMessageSerializer`, contract attributes, and `JsonRpcPeer` (correlated calls, notifications, batches, streams) |
-| `JsonCall.Client` | `JsonRpcClient` and the `DispatchProxy` typed proxy |
-| `JsonCall.Server` | Dispatcher: method table, parameter binding, error mapping, stream producers |
-| `JsonCall.Transport` | WebSocket, TCP, stdio (Content-Length framing) and HTTP (with SSE streaming) transports |
-| `JsonCall.Serializer.Cbor`, `JsonCall.Serializer.MessagePack` | Binary wire formats (JSON is built in) |
-| `JsonCall.AspNetCore` | `AddJsonRpc` and `MapJsonRpc`: HTTP POST, SSE and WebSocket on one route |
-| `JsonCall.OpenRpc` | OpenRPC document from contracts (Draft 07 schemas, XML docs) and `rpc.discover` |
-| `JsonCall.Generator` | Source generator: typed client from `*.openrpc.json` AdditionalFiles |
-| `JsonCall.Tool` | `jsoncall` dotnet tool, the same generator on the command line |
+| `JsonCall.Core` | Message model, `IMessageTransport`, `IMessageSerializer`, contract attributes and `JsonRpcPeer` (correlated calls, notifications, batches, streams) |
+| `JsonCall.Client` | `JsonRpcClient` and the typed proxy for contract interfaces |
+| `JsonCall.Server` | Dispatcher: method table, parameter binding, error mapping, stream producers, `JsonRpcConnectionSet` |
+| `JsonCall.Transport` | WebSocket, TCP, Unix domain socket, stdio and HTTP (with SSE) transports |
+| `JsonCall.Serializer.Cbor`, `JsonCall.Serializer.MessagePack` | Binary wire formats |
+| `JsonCall.AspNetCore` | `AddJsonRpc` and `MapJsonRpc` |
+| `JsonCall.OpenRpc` | OpenRPC document from contracts, and `rpc.discover` |
+| `JsonCall.Generator` | Source generator: typed client from `*.openrpc.json` |
+| `JsonCall.Tool` | The `jsoncall` dotnet tool: the same generator on the command line |
 
 ## Quick start
 
+The contract, shared by server and client:
+
 ```csharp
+using JsonCall.Core;
+
 [JsonRpcContract]
 public interface IMath
 {
-    Task<int> AddAsync(int a, int b, CancellationToken ct = default);   // wire name "add"
-}
+    Task<int> AddAsync(int a, int b, CancellationToken ct = default);          // wire name "add"
 
-public interface IEvents
-{
-    IAsyncEnumerable<Tick> TicksAsync(int count, CancellationToken ct); // streamed
+    IAsyncEnumerable<int> CountAsync(int to, CancellationToken ct = default);  // streamed, wire name "count"
 }
 ```
 
-Server (ASP.NET Core):
+The server:
 
 ```csharp
-builder.Services.AddJsonRpc(o => o.AddContract<IMath, MathService>());
-app.MapJsonRpc("/rpc");                // POST, SSE and WebSocket on /rpc
+using JsonCall.AspNetCore;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddJsonRpc(o => o.AddContract<IMath, MathService>());   // MathService is resolved per call
+
+var app = builder.Build();
+app.MapJsonRpc("/rpc");                                                  // POST, SSE and WebSocket
+app.Run();
 ```
 
-Client, over any transport:
+The client:
 
 ```csharp
+using JsonCall.Client;
+using JsonCall.Transport;
+
 var transport = await WebSocketMessageTransport.ConnectAsync(new Uri("ws://localhost:5000/rpc"));
 await using var client = new JsonRpcClient(transport);
+
 var math = client.CreateProxy<IMath>();
 var sum = await math.AddAsync(1, 2);
+
+await foreach (var n in math.CountAsync(10))
+    Console.WriteLine(n);
 ```
+
+Swap `WebSocketMessageTransport` for `HttpMessageTransport`, `TcpMessageTransport`, `UnixSocketMessageTransport` or
+`StdioMessageTransport` and nothing else changes.
 
 ## OpenRPC
 
-Serve the document of your contracts on `rpc.discover`:
+Serve the document of your contracts:
 
 ```csharp
+using JsonCall.OpenRpc;
+
 builder.Services.AddJsonRpc(o => o
     .AddContract<IMath, MathService>()
-    .AddOpenRpc(r => r.PublicBaseUrl = "https://api.example.com/rpc"));
+    .AddOpenRpc(r => r.PublicBaseUrl = "https://api.example.com/rpc"));   // adds rpc.discover
 ```
 
-Generate a typed client from a document, at build time:
+Generate a typed client from a document at build time:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="JsonCall.Generator" PrivateAssets="all" />
+  <PackageReference Include="JsonCall.Generator" Version="0.1.0-preview.1" PrivateAssets="all" />
+  <PackageReference Include="JsonCall.Client" Version="0.1.0-preview.1" />
   <AdditionalFiles Include="api.openrpc.json" Namespace="Acme.Api" ClientName="AcmeClient" />
 </ItemGroup>
 ```
 
-or with the tool: `jsoncall generate api.openrpc.json --out ./gen`, or `jsoncall generate --url https://host/rpc --discover`.
-
-If the document refers to sibling schema files (`{"$ref": "diagnostic.schema.json"}`), the tool reads them from the
-document's directory. A source generator can only see `AdditionalFiles`, so add the schemas there too:
-
-```xml
-<AdditionalFiles Include="lsp/lsp.openrpc.json" Namespace="Lsp" ClientName="LanguageServerClient" />
-<AdditionalFiles Include="lsp/basic.schema.json" />
-<AdditionalFiles Include="lsp/diagnostic.schema.json" />
-```
-
-### Pushed notifications
-
-A generated method with no result (for example `EventAsync`) is a **call** that sends a notification to the
-server. It is not a subscription. To receive notifications the server pushes, mark the method in the document with
-`"x-jsoncall-direction": "server-to-client"`. The generator then emits a typed `On<Name>` handler on the client
-instead of a call, and leaves the method off the call interface:
-
 ```csharp
-var client = new LanguageServerClient(peer);
-client.OnTextDocumentPublishDiagnostics((uri, version, diagnostics) => Show(uri, diagnostics));
+var acme = new AcmeClient(client);       // any JsonRpcPeer: any transport, any serializer
 ```
 
-Handler arguments follow the document's param order. Params are read by name or by position, and omitted optional
-params arrive as `null`. Registering a handler again
-replaces the previous one. Without the marker, or with a lower-level peer, use `peer.OnNotification("event", ...)`.
+Or on the command line: `jsoncall generate api.openrpc.json --out ./gen`, or straight from a running server with
+`jsoncall generate --url https://host/rpc --discover`.
 
-## Broadcasting from a daemon
+## Documentation
 
-`JsonRpcServer.Attach` returns an untracked peer. `JsonRpcConnectionSet` tracks the peers, drops them when
-their connection ends, and broadcasts notifications:
+| Guide | Covers |
+| --- | --- |
+| [Getting started](https://github.com/ljfio/JsonCall/blob/main/docs/getting-started.md) | Contracts, servers with and without ASP.NET Core, clients, errors, cancellation, batches, authorization |
+| [Transports and wire formats](https://github.com/ljfio/JsonCall/blob/main/docs/transports.md) | Each transport, framing, CBOR and MessagePack, size limits, broadcasting, writing your own |
+| [Streaming](https://github.com/ljfio/JsonCall/blob/main/docs/streaming.md) | `IAsyncEnumerable<T>` end to end, and the wire convention for implementers in other languages |
+| [OpenRPC](https://github.com/ljfio/JsonCall/blob/main/docs/openrpc.md) | Document generation, `rpc.discover`, client generation, schema mapping, generator diagnostics |
+| [Comparison](https://github.com/ljfio/JsonCall/blob/main/docs/comparison.md) | How JsonCall differs from StreamJsonRpc and other .NET JSON-RPC libraries, and when to choose them |
+| [Roadmap](https://github.com/ljfio/JsonCall/blob/main/docs/ROADMAP.md) | Known issues, what is planned before 1.0, and what is out of scope |
+| [Product requirements](https://github.com/ljfio/JsonCall/blob/main/docs/PRD.md) | The design record: goals, requirements and decisions |
 
-```csharp
-var connections = new JsonRpcConnectionSet();
-connections.Attach(server, transport);                       // per accepted connection
-await connections.BroadcastAsync("event", JsonRpcParams.Single(payload));
-await connections.BroadcastAsync("event", JsonRpcParams.Single(payload), filter: p => IsSubscribed(p));
+## Building and testing
+
+```sh
+dotnet build
+dotnet test
 ```
 
-## Stream transports and framing
+Acceptance criteria live in [`specs/features`](https://github.com/ljfio/JsonCall/tree/main/specs/features) as Gherkin and run through Reqnroll and xUnit in
+`test/JsonCall.Specs`. Every requirement in the PRD is tagged on the scenarios that prove it (`@FR-...`). Step
+definitions go in `test/JsonCall.Specs/Steps`; `dotnet test` reports a scenario without one as skipped.
 
-TCP, Unix domain sockets and stdio default to `Content-Length` framing. Pass `MessageFraming.Newline` for one JSON message
-per line (JSON serializer only):
+## License
 
-```csharp
-await using var transport = await UnixSocketMessageTransport.ConnectAsync("/run/daemon.sock", MessageFraming.Newline);
-await using var client = new JsonRpcClient(transport);
-
-using var listener = new UnixSocketMessageListener("/run/daemon.sock", MessageFraming.Newline); // server side
-server.Attach(await listener.AcceptAsync());
-```
-
-## Specifications
-
-Acceptance criteria live in [`specs/features`](specs/features) as Gherkin and run via Reqnroll + xUnit in `test/JsonCall.Specs`.
-All specs have step definitions. `dotnet test` reports any spec without one as skipped.
-Step definitions go in `test/JsonCall.Specs/Steps`.
+[MIT](https://github.com/ljfio/JsonCall/blob/main/LICENSE)

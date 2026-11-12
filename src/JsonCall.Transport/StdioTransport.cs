@@ -14,7 +14,7 @@ public static class StdioMessageTransport
         new(startInfo, framing);
 }
 
-/// <summary>A child process speaking JSON-RPC on stdio. Standard error is exposed on <see cref="Diagnostics"/>.</summary>
+/// <summary>A child process speaking JSON-RPC on stdio. Standard error is exposed on <see cref="DiagnosticsReceived"/>.</summary>
 public sealed class StdioProcessTransport : IMessageTransport
 {
     private readonly Process _process;

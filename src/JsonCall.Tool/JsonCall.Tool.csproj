@@ -7,6 +7,8 @@
         <Nullable>enable</Nullable>
         <AssemblyName>jsoncall</AssemblyName>
         <RootNamespace>JsonCall.Tool</RootNamespace>
+        <!-- The assembly is named after the command; the package keeps the JsonCall. prefix. -->
+        <PackageId>JsonCall.Tool</PackageId>
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>jsoncall</ToolCommandName>
         <Description>The jsoncall dotnet tool: generates a typed JSON-RPC client from an OpenRPC document or a live rpc.discover endpoint, using the same generator as JsonCall.Generator.</Description>
