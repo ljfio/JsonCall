@@ -46,8 +46,21 @@ public sealed class World
 public sealed class Hooks
 {
     private readonly World _world;
+    private readonly Reqnroll.UnitTestProvider.IUnitTestRuntimeProvider _runtime;
 
-    public Hooks(World world) => _world = world;
+    public Hooks(World world, Reqnroll.UnitTestProvider.IUnitTestRuntimeProvider runtime)
+    {
+        _world = world;
+        _runtime = runtime;
+    }
+
+    /// <summary>Scenarios tagged @unix-only need Unix domain sockets; they are skipped, not failed, on Windows.</summary>
+    [BeforeScenario("unix-only", Order = 0)]
+    public void SkipOnWindows()
+    {
+        if (OperatingSystem.IsWindows())
+            _runtime.TestIgnore("Unix domain sockets are only exercised on macOS and Linux.");
+    }
 
     [AfterScenario]
     public Task AfterScenario() => _world.CleanupAsync();

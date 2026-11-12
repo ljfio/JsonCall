@@ -128,7 +128,11 @@ public static class Cli
         if (ns is not null)
             settings.Namespace = ns;
 
-        var result = ClientGenerator.Generate(text, name, settings);
+        // Sibling schema files are resolved against the document's directory on disk.
+        var documentPath = file is not null ? Path.GetFullPath(file) : Path.GetFullPath(Path.Combine(outDir, name));
+
+        var result = ClientGenerator.Generate(text, documentPath, settings,
+            (key, _) => File.Exists(key) ? File.ReadAllText(key) : null);
         var exit = 0;
 
         foreach (var diagnostic in result.Diagnostics)

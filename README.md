@@ -69,6 +69,31 @@ Generate a typed client from a document, at build time:
 
 or with the tool: `jsoncall generate api.openrpc.json --out ./gen`, or `jsoncall generate --url https://host/rpc --discover`.
 
+If the document refers to sibling schema files (`{"$ref": "diagnostic.schema.json"}`), the tool reads them from the
+document's directory. A source generator can only see `AdditionalFiles`, so add the schemas there too:
+
+```xml
+<AdditionalFiles Include="lsp/lsp.openrpc.json" Namespace="Lsp" ClientName="LanguageServerClient" />
+<AdditionalFiles Include="lsp/basic.schema.json" />
+<AdditionalFiles Include="lsp/diagnostic.schema.json" />
+```
+
+Pushed notifications are not part of the generated client's surface: a generated `...Async` method is a call. Consume
+notifications with `peer.OnNotification("event", ...)` on the `JsonRpcPeer` the client wraps.
+
+## Stream transports and framing
+
+TCP, Unix domain sockets and stdio default to `Content-Length` framing. Pass `MessageFraming.Newline` for one JSON message
+per line (JSON serializer only):
+
+```csharp
+await using var transport = await UnixSocketMessageTransport.ConnectAsync("/run/daemon.sock", MessageFraming.Newline);
+await using var client = new JsonRpcClient(transport);
+
+using var listener = new UnixSocketMessageListener("/run/daemon.sock", MessageFraming.Newline); // server side
+server.Attach(await listener.AcceptAsync());
+```
+
 ## Specifications
 
 Acceptance criteria live in [`specs/features`](specs/features) as Gherkin and run via Reqnroll + xUnit in `test/JsonCall.Specs`.

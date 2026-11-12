@@ -1,0 +1,57 @@
+{
+  "openrpc": "1.2.6",
+  "info": {
+    "title": "Agent Client Protocol",
+    "version": "1",
+    "description": "The agent side of a subset of the Agent Client Protocol written as OpenRPC. The types live in the sibling schema.json. Each ACP params object becomes by-name params."
+  },
+  "methods": [
+    {
+      "name": "initialize",
+      "summary": "Negotiates the protocol version and exchanges capabilities.",
+      "paramStructure": "by-name",
+      "params": [
+        { "name": "protocolVersion", "required": true, "schema": { "$ref": "schema.json#/$defs/ProtocolVersion" } },
+        { "name": "clientCapabilities", "required": false, "schema": { "$ref": "schema.json#/$defs/ClientCapabilities" } }
+      ],
+      "result": { "name": "result", "schema": { "$ref": "schema.json#/$defs/InitializeResponse" } }
+    },
+    {
+      "name": "session/new",
+      "summary": "Creates a new conversation session.",
+      "paramStructure": "by-name",
+      "params": [
+        { "name": "cwd", "required": true, "schema": { "type": "string" } },
+        { "name": "mcpServers", "required": true, "schema": { "type": "array", "items": { "$ref": "schema.json#/$defs/McpServer" } } }
+      ],
+      "result": { "name": "result", "schema": { "$ref": "schema.json#/$defs/NewSessionResponse" } }
+    },
+    {
+      "name": "session/prompt",
+      "summary": "Sends a user prompt; the agent streams session/update notifications until it returns a stop reason.",
+      "paramStructure": "by-name",
+      "params": [
+        { "name": "sessionId", "required": true, "schema": { "$ref": "schema.json#/$defs/SessionId" } },
+        { "name": "prompt", "required": true, "schema": { "type": "array", "items": { "$ref": "schema.json#/$defs/ContentBlock" } } }
+      ],
+      "result": { "name": "result", "schema": { "$ref": "schema.json#/$defs/PromptResponse" } }
+    },
+    {
+      "name": "session/cancel",
+      "summary": "Cancels the ongoing operations of a session (a notification).",
+      "paramStructure": "by-name",
+      "params": [
+        { "name": "sessionId", "required": true, "schema": { "$ref": "schema.json#/$defs/SessionId" } }
+      ]
+    },
+    {
+      "name": "session/update",
+      "summary": "Reports progress on a session to the client (a notification from the agent).",
+      "paramStructure": "by-name",
+      "params": [
+        { "name": "sessionId", "required": true, "schema": { "$ref": "schema.json#/$defs/SessionId" } },
+        { "name": "update", "required": true, "schema": { "$ref": "schema.json#/$defs/SessionUpdate" } }
+      ]
+    }
+  ]
+}

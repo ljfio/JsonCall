@@ -55,7 +55,7 @@ The existing prototype (`JsonCall`) proves the serializer split but has: a clien
 | `JsonCall.Generator` | Roslyn incremental source generator: `*.openrpc.json` AdditionalFiles to C# (netstandard2.0 analyzer) | none at runtime |
 | `JsonCall.Tool` (`jsoncall`) | dotnet tool, same generator code: `generate <file>` and `generate --url <u> --discover` | none at runtime |
 
-Transport owns **framing**: WebSocket and SSE are already message-oriented; TCP and stdio use `Content-Length` header framing by default (newline-delimited selectable). The core only ever sees whole messages.
+Transport owns **framing**: WebSocket and SSE are already message-oriented; TCP, Unix domain sockets and stdio use `Content-Length` header framing by default, with newline-delimited framing selectable per transport (`MessageFraming.Newline`). The core only ever sees whole messages.
 
 > **Implementation note.** The transports ship in a single `JsonCall.Transport` package rather than four, and
 > wire formats are JSON-model transcoders (`IMessageSerializer` converts wire bytes to and from canonical JSON), so the
@@ -77,6 +77,8 @@ IDs are referenced from feature-file tags (`@FR-xxx`) so every requirement is tr
 ### 6.2 Transports and client (`02-transports.feature`, `03-client.feature`)
 - **FR-TRANS-01** A single `IMessageTransport` seam (send message, receive message stream, close) with identical client behaviour across WebSocket, TCP, stdio and HTTP.
 - **FR-TRANS-02** TCP and stdio framing is correct for split, coalesced and large messages.
+- **FR-TRANS-03** Stream transports (TCP, Unix domain socket, stdio) accept a framing choice, `MessageFraming.ContentLength` (default) or `MessageFraming.Newline`: one message per `\n` (`\r\n` accepted, blank lines ignored), no headers. Newline framing has the same failure semantics and maximum message size as Content-Length framing (`ConnectionLostException` for a close mid-message, `TransportFramingException` for a Content-Length header received by a newline reader, `MessageTooLargeException`), is correct for split, coalesced and large messages, and refuses to send a message containing a raw newline (compact JSON only).
+- **FR-TRANS-04** Unix domain sockets: `UnixSocketMessageTransport.ConnectAsync(path, framing)` and `UnixSocketMessageListener(path, framing)` work with either framing. A connect failure (nothing listening, stale socket file) is a `ConnectionLostException` at connect, as for TCP. The listener removes its socket file on dispose, replaces a stale file, and refuses a path another listener serves. Scenarios are skipped, not failed, on Windows.
 - **FR-CLIENT-01** Concurrent calls on one connection are correlated by id, in any response order.
 - **FR-CLIENT-02** Per-call timeout and `CancellationToken`; cancelling sends a cancel notification when the transport is stateful (see FR-STREAM-04).
 - **FR-CLIENT-03** Server-to-client notifications are delivered to registered handlers and never confused with responses. On bidirectional transports the server may also call methods the client exposes.
@@ -124,6 +126,7 @@ IDs are referenced from feature-file tags (`@FR-xxx`) so every requirement is tr
 - **FR-GEN-02** Draft 07 constructs map to C#: objects, arrays, enums, nullable, `required`, `$ref` (including cycles), `allOf`; `oneOf`/`anyOf` map to a documented union strategy.
 - **FR-GEN-03** Generated clients target the same `JsonRpcClient` and are transport/serializer agnostic.
 - **FR-GEN-04** Output is deterministic and diagnostics point at the offending JSON path.
+- **FR-GEN-06** `$ref`s to sibling JSON Schema files (`event.schema.json`, `event.schema.json#/definitions/x`) are resolved. The command line tool reads them from the document's directory; the source generator only sees AdditionalFiles, so it resolves them against the other `.json` AdditionalFiles (exact relative path, then a unique trailing path, then a unique file name) and consumers must add the schemas as AdditionalFiles too. Documents are parsed once and cached, cycles terminate, the loaded documents are reported (Info `JSONCALL007`), and a reference that still cannot be resolved keeps the `JSONCALL006` warning with its JSON path and falls back to `JsonElement`.
 - **FR-GEN-05** A generate-then-regenerate round trip (contract to OpenRPC to generated client) yields a client wire-compatible with the original contract.
 
 ## 7. Non-functional requirements
@@ -153,6 +156,7 @@ IDs are referenced from feature-file tags (`@FR-xxx`) so every requirement is tr
 | 3. Streaming (done, D2 still draft) | SSE and `$/stream` convention, client consumption, cleanup | `05` green, D2 ratified |
 | 4. OpenRPC out (done) | Generator, `rpc.discover`, meta-schema validation | `07` green |
 | 5. OpenRPC in (done) | Source generator and CLI | `08` green, round-trip proven |
+| 6. Daemon fit (done) | Sibling `$ref` resolution, newline framing, Unix domain sockets | `02` and `08` green for FR-TRANS-03/04 and FR-GEN-06, Language Server Protocol and Agent Client Protocol contracts locked by golden files |
 
 ## 10. Risks
 
@@ -194,3 +198,11 @@ IDs are referenced from feature-file tags (`@FR-xxx`) so every requirement is tr
 - **Generated clients** take any `JsonRpcPeer`, and send params by name, by position, or per the client default as `paramStructure` says. Documented errors become exception types deriving from `JsonRpcException`.
 - **AOT JSON context.** Source generators cannot see each other's output, so a `JsonSerializerContext` declaration is emitted only by `jsoncall generate --json-context` (the project compiles it and the System.Text.Json generator completes it).
 - **Third-party documents under test:** Petstore and the link example (open-rpc/examples) and the Ethereum execution API (CC0). Bitcoin Core publishes no OpenRPC document, so the link example replaces it.
+
+## 13. Implementation notes: phase 6
+
+- **Sibling schema files.** A reference is resolved relative to the document that contains it, so a sibling schema may itself refer to further siblings or to a pointer inside itself (`#`, `#/definitions/x`). A whole document is named after its file (`event.schema.json` is `Event`); a `title` that extends the file name (`Daemon event`) is preferred (`DaemonEvent`). A pointer into a document is named after its last segment. Diagnostics raised inside a referenced document point at the `$ref` in the main document, with the JSON path continuing as `<document>#<pointer path>`. Remote (`https://`) references are not fetched and keep the `JSONCALL006` fallback.
+- **Real-world contracts under test.** Neither the Language Server Protocol (a meta model) nor the Agent Client Protocol (a JSON Schema) publishes an OpenRPC document, so subsets of both are written as OpenRPC in `test/JsonCall.Specs/Support/Data/lsp` and `.../acp`. Their types sit in sibling schema files: LSP across three Draft 07 files with `definitions` and a file-to-file reference, ACP in one `schema.json` with `$defs` and `const`-discriminated unions. Golden files lock the generated clients.
+- **Newline framing** is a `MessageFraming` option on `StreamMessageTransport`, threaded through `TcpMessageTransport`/`TcpMessageListener`, `StdioMessageTransport` and the Unix socket types. It is JSON only; the CBOR and MessagePack serializers need `ContentLength`.
+- **TCP connect failures** now surface as `ConnectionLostException` (previously a `SocketException`), so TCP and Unix socket connects behave the same.
+- **Notifications from a server** reach a generated client through `OnNotification(...)` on the peer the client wraps; a generated `...EventAsync` method is a call, not a subscription. Typed `On<T>` helpers and a connection-set broadcast helper for daemons are deliberately not built yet.

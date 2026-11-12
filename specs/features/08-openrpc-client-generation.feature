@@ -200,3 +200,95 @@ Feature: Typed client generation from OpenRPC documents
       | petstore-openrpc.json             |
       | ethereum-execution-apis.json      |
       | link-example-openrpc.json         |
+
+  # Schemas split across files: {"$ref": "event.schema.json"}. A source generator only sees AdditionalFiles, so the
+  # sibling schemas must be added as AdditionalFiles too; the command line tool reads them from the document's directory.
+  @FR-GEN-06 @phase6
+  Scenario: Sibling schema files resolve through AdditionalFiles
+    Given a method "probe" whose result schema is {"$ref":"event.schema.json"}
+    And the sibling schema "event.schema.json" is included as an AdditionalFile with title "Daemon event" and properties "type" and "at"
+    When the client is generated
+    Then a record "DaemonEvent" with the properties "Type" and "At" is generated
+    And the probe result type is "DaemonEvent"
+    And no JSONCALL006 diagnostic is reported
+    And the generated code compiles with no errors
+
+  @FR-GEN-06 @phase6
+  Scenario: A sibling schema is found by its path relative to the document
+    Given a method "probe" whose result schema is {"$ref":"schemas/hit.schema.json"}
+    And the sibling schema "schemas/hit.schema.json" is included as an AdditionalFile with title "hit" and properties "id" and "rank"
+    When the client is generated
+    Then a record "Hit" with the properties "Id" and "Rank" is generated
+    And no JSONCALL006 diagnostic is reported
+
+  @FR-GEN-06 @phase6
+  Scenario: Nested pointers into a sibling schema are followed
+    Given a method "probe" whose result schema is {"$ref":"shapes.schema.json#/definitions/point"}
+    And the sibling schema "shapes.schema.json" is included as an AdditionalFile with a definition "point" with properties "x" and "y"
+    When the client is generated
+    Then a record "Point" with the properties "X" and "Y" is generated
+    And no JSONCALL006 diagnostic is reported
+
+  @FR-GEN-06 @phase6
+  Scenario: Sibling schemas that refer to each other, and to themselves, resolve without looping
+    Given a method "probe" whose result schema is {"$ref":"a.schema.json"}
+    And the sibling schemas "a.schema.json" and "b.schema.json" refer to each other
+    When the client is generated
+    Then the generated code compiles with no errors
+    And the records "A" and "B" are generated
+    And no JSONCALL006 diagnostic is reported
+
+  @FR-GEN-06 @phase6
+  Scenario: A sibling schema that is not an AdditionalFile keeps the JsonElement fallback
+    Given a method "probe" whose result schema is {"$ref":"missing.schema.json"}
+    When the client is generated
+    Then a JSONCALL006 warning is reported at the JSON path "methods[0].result.schema.$ref"
+    And the probe result type is "JsonElement"
+
+  @FR-GEN-06 @phase6
+  Scenario: A pointer that leads nowhere is reported with its JSON path
+    Given a method "probe" whose result schema is {"$ref":"shapes.schema.json#/definitions/nope"}
+    And the sibling schema "shapes.schema.json" is included as an AdditionalFile with a definition "point" with properties "x" and "y"
+    When the client is generated
+    Then a JSONCALL006 warning is reported at the JSON path "methods[0].result.schema.$ref"
+
+  @FR-GEN-06 @phase6
+  Scenario: Editing a sibling schema regenerates the client
+    Given a method "probe" whose result schema is {"$ref":"event.schema.json"}
+    And the sibling schema "event.schema.json" is included as an AdditionalFile with title "Daemon event" and properties "type" and "at"
+    And the project has been built once with the sibling schema
+    When the sibling schema gains the property "extra"
+    Then the generator executes again and the record has the property "Extra"
+
+  @FR-GEN-06 @phase6
+  Scenario: The command line tool resolves sibling schemas from the document's directory
+    Given a directory holding "api.openrpc.json" with a method "probe" whose result is {"$ref":"event.schema.json"}
+    And the directory also holds "event.schema.json" with title "Daemon event" and properties "type" and "at"
+    When "jsoncall generate api.openrpc.json --out ./gen" is run in that directory
+    Then the generated client has a record "DaemonEvent"
+    And the tool output reports that "event.schema.json" was loaded
+    And the tool output has no JSONCALL006 warning
+
+  # Real-world contracts: subsets of two standard protocols written as OpenRPC, with their types in sibling schema
+  # files the way the protocols publish them (Support/Data/lsp and Support/Data/acp). Golden files lock the output.
+  @FR-GEN-06 @phase6 @lsp
+  Scenario: The Language Server Protocol contract generates fully typed from its sibling schemas
+    Given the contract "lsp/lsp.openrpc.json" with its sibling schemas "lsp/basic.schema.json", "lsp/diagnostic.schema.json" and "lsp/window.schema.json"
+    And the client is named "LanguageServerClient" in the namespace "Lsp"
+    When the client is generated
+    Then the records "Diagnostic" and "Range" are generated
+    And the records "Hover" and "WorkDoneProgressBegin" are generated
+    And no JSONCALL006 diagnostic is reported
+    And the generated code compiles with no errors
+    And the generated client matches the checked-in golden "lsp/LanguageServerClient.g.cs.txt" byte for byte
+
+  @FR-GEN-06 @phase6 @acp
+  Scenario: The Agent Client Protocol contract generates fully typed from its $defs schema
+    Given the contract "acp/acp.openrpc.json" with its sibling schemas "acp/schema.json"
+    And the client is named "AgentClient" in the namespace "Acp"
+    When the client is generated
+    Then the records "SessionUpdate" and "ContentBlock" are generated
+    And the records "InitializeResponse" and "McpServer" are generated
+    And no JSONCALL006 diagnostic is reported
+    And the generated code compiles with no errors
+    And the generated client matches the checked-in golden "acp/AgentClient.g.cs.txt" byte for byte

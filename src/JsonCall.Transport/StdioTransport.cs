@@ -6,11 +6,12 @@ namespace JsonCall.Transport;
 public static class StdioMessageTransport
 {
     /// <summary>Uses this process's standard input and output (for a server launched by a client).</summary>
-    public static IMessageTransport FromConsole() =>
-        new StreamMessageTransport(Console.OpenStandardInput(), Console.OpenStandardOutput());
+    public static IMessageTransport FromConsole(MessageFraming framing = MessageFraming.ContentLength) =>
+        new StreamMessageTransport(Console.OpenStandardInput(), Console.OpenStandardOutput(), framing: framing);
 
     /// <summary>Launches a child process and talks to it over its standard input and output.</summary>
-    public static StdioProcessTransport Launch(ProcessStartInfo startInfo) => new(startInfo);
+    public static StdioProcessTransport Launch(ProcessStartInfo startInfo, MessageFraming framing = MessageFraming.ContentLength) =>
+        new(startInfo, framing);
 }
 
 /// <summary>A child process speaking JSON-RPC on stdio. Standard error is exposed on <see cref="Diagnostics"/>.</summary>
@@ -19,7 +20,7 @@ public sealed class StdioProcessTransport : IMessageTransport
     private readonly Process _process;
     private readonly StreamMessageTransport _inner;
 
-    internal StdioProcessTransport(ProcessStartInfo startInfo)
+    internal StdioProcessTransport(ProcessStartInfo startInfo, MessageFraming framing)
     {
         startInfo.RedirectStandardInput = true;
         startInfo.RedirectStandardOutput = true;
@@ -36,7 +37,7 @@ public sealed class StdioProcessTransport : IMessageTransport
         _process.Start();
         _process.BeginErrorReadLine();
 
-        _inner = new StreamMessageTransport(_process.StandardOutput.BaseStream, _process.StandardInput.BaseStream);
+        _inner = new StreamMessageTransport(_process.StandardOutput.BaseStream, _process.StandardInput.BaseStream, framing: framing);
     }
 
     /// <summary>Raised for each line the child writes to standard error.</summary>

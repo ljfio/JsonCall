@@ -54,6 +54,7 @@ internal static class DiagnosticIds
     public const string UnionFallback = "JSONCALL004";
     public const string ParseError = "JSONCALL005";
     public const string UnresolvedReference = "JSONCALL006";
+    public const string DocumentLoaded = "JSONCALL007";
 }
 
 internal sealed class GenSettings
@@ -92,6 +93,9 @@ internal sealed class GenResult
     public List<GenFile> Files { get; } = new();
 
     public List<GenDiagnostic> Diagnostics { get; } = new();
+
+    /// <summary>The keys (normalised paths) of the referenced documents that were loaded, in load order.</summary>
+    public List<string> LoadedDocuments { get; } = new();
 
     public bool HasErrors
     {

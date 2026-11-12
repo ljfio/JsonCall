@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent Client Protocol",
+  "description": "A subset of the Agent Client Protocol schema, laid out like the published schema.json (types under $defs, unions discriminated by a const property).",
+  "$defs": {
+    "ProtocolVersion": {
+      "type": "integer",
+      "format": "uint16",
+      "minimum": 0,
+      "maximum": 65535
+    },
+    "SessionId": {
+      "description": "A unique identifier for a conversation session.",
+      "type": "string"
+    },
+    "ClientCapabilities": {
+      "type": "object",
+      "properties": {
+        "fs": { "$ref": "#/$defs/FileSystemCapability" },
+        "terminal": { "type": "boolean" }
+      }
+    },
+    "FileSystemCapability": {
+      "type": "object",
+      "properties": {
+        "readTextFile": { "type": "boolean" },
+        "writeTextFile": { "type": "boolean" }
+      }
+    },
+    "AgentCapabilities": {
+      "type": "object",
+      "properties": {
+        "loadSession": { "type": "boolean" },
+        "promptCapabilities": { "$ref": "#/$defs/PromptCapabilities" }
+      }
+    },
+    "PromptCapabilities": {
+      "type": "object",
+      "properties": {
+        "image": { "type": "boolean" },
+        "audio": { "type": "boolean" },
+        "embeddedContext": { "type": "boolean" }
+      }
+    },
+    "InitializeResponse": {
+      "type": "object",
+      "required": ["protocolVersion"],
+      "properties": {
+        "protocolVersion": { "$ref": "#/$defs/ProtocolVersion" },
+        "agentCapabilities": { "$ref": "#/$defs/AgentCapabilities" }
+      }
+    },
+    "McpServer": {
+      "type": "object",
+      "required": ["name", "command", "args", "env"],
+      "properties": {
+        "name": { "type": "string" },
+        "command": { "type": "string" },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "env": { "type": "array", "items": { "$ref": "#/$defs/EnvVariable" } }
+      }
+    },
+    "EnvVariable": {
+      "type": "object",
+      "required": ["name", "value"],
+      "properties": {
+        "name": { "type": "string" },
+        "value": { "type": "string" }
+      }
+    },
+    "NewSessionResponse": {
+      "type": "object",
+      "required": ["sessionId"],
+      "properties": {
+        "sessionId": { "$ref": "#/$defs/SessionId" }
+      }
+    },
+    "ContentBlock": {
+      "oneOf": [
+        {
+          "description": "Plain text.",
+          "type": "object",
+          "required": ["type", "text"],
+          "properties": {
+            "type": { "const": "text" },
+            "text": { "type": "string" }
+          }
+        },
+        {
+          "description": "An image, base64 encoded.",
+          "type": "object",
+          "required": ["type", "data", "mimeType"],
+          "properties": {
+            "type": { "const": "image" },
+            "data": { "type": "string" },
+            "mimeType": { "type": "string" }
+          }
+        },
+        {
+          "description": "A link to a resource the agent can read.",
+          "type": "object",
+          "required": ["type", "uri", "name"],
+          "properties": {
+            "type": { "const": "resource_link" },
+            "uri": { "type": "string" },
+            "name": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "StopReason": {
+      "type": "string",
+      "enum": ["end_turn", "max_tokens", "max_turn_requests", "refusal", "cancelled"]
+    },
+    "PromptResponse": {
+      "type": "object",
+      "required": ["stopReason"],
+      "properties": {
+        "stopReason": { "$ref": "#/$defs/StopReason" }
+      }
+    },
+    "SessionUpdate": {
+      "oneOf": [
+        {
+          "description": "A chunk of the agent's response.",
+          "type": "object",
+          "required": ["sessionUpdate", "content"],
+          "properties": {
+            "sessionUpdate": { "const": "agent_message_chunk" },
+            "content": { "$ref": "#/$defs/ContentBlock" }
+          }
+        },
+        {
+          "description": "A chunk of the agent's internal reasoning.",
+          "type": "object",
+          "required": ["sessionUpdate", "content"],
+          "properties": {
+            "sessionUpdate": { "const": "agent_thought_chunk" },
+            "content": { "$ref": "#/$defs/ContentBlock" }
+          }
+        },
+        {
+          "description": "A new tool call started by the agent.",
+          "type": "object",
+          "required": ["sessionUpdate", "toolCallId", "title"],
+          "properties": {
+            "sessionUpdate": { "const": "tool_call" },
+            "toolCallId": { "type": "string" },
+            "title": { "type": "string" },
+            "kind": { "type": "string", "enum": ["read", "edit", "delete", "move", "search", "execute", "think", "fetch", "other"] },
+            "status": { "type": "string", "enum": ["pending", "in_progress", "completed", "failed"] }
+          }
+        },
+        {
+          "description": "The agent's execution plan.",
+          "type": "object",
+          "required": ["sessionUpdate", "entries"],
+          "properties": {
+            "sessionUpdate": { "const": "plan" },
+            "entries": { "type": "array", "items": { "$ref": "#/$defs/PlanEntry" } }
+          }
+        }
+      ]
+    },
+    "PlanEntry": {
+      "type": "object",
+      "required": ["content", "priority", "status"],
+      "properties": {
+        "content": { "type": "string" },
+        "priority": { "type": "string", "enum": ["high", "medium", "low"] },
+        "status": { "type": "string", "enum": ["pending", "in_progress", "completed"] }
+      }
+    }
+  }
+}

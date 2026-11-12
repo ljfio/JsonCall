@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -14,6 +15,12 @@ namespace JsonCall.Generator;
 /// <summary>
 /// Generates a typed client from every <c>*.openrpc.json</c>, <c>*-openrpc.json</c> or <c>openrpc.json</c> in AdditionalFiles.
 /// </summary>
+/// <remarks>
+/// A source generator only sees AdditionalFiles, so a document that refers to sibling schema files
+/// (<c>{"$ref": "event.schema.json"}</c>) is resolved against the other <c>.json</c> AdditionalFiles: first by the path
+/// relative to the document, then by a unique trailing path, then by a unique file name. Consumers must add the
+/// sibling schemas as AdditionalFiles too.
+/// </remarks>
 [Generator]
 public sealed class OpenRpcClientGenerator : IIncrementalGenerator
 {
@@ -24,10 +31,18 @@ public sealed class OpenRpcClientGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
+        // Sibling schemas: every other .json AdditionalFile. Their text is part of each input, so editing one regenerates.
+        var siblings = context.AdditionalTextsProvider
+            .Where(static text => IsSiblingCandidate(text.Path))
+            .Select(static (text, cancellationToken) => new Sibling(text.Path, text.GetText(cancellationToken)?.ToString() ?? string.Empty))
+            .Collect();
+
         var inputs = context.AdditionalTextsProvider
             .Where(static text => IsOpenRpcFile(text.Path))
             .Combine(context.AnalyzerConfigOptionsProvider)
             .Select(static (pair, cancellationToken) => ReadInput(pair.Left, pair.Right, cancellationToken))
+            .Combine(siblings)
+            .Select(static (pair, _) => pair.Left.WithSiblings(pair.Right))
             .WithTrackingName(InputStepName);
 
         context.RegisterSourceOutput(inputs, static (output, input) => Generate(output, input));
@@ -42,6 +57,9 @@ public sealed class OpenRpcClientGenerator : IIncrementalGenerator
                || name.EndsWith("_openrpc.json", StringComparison.OrdinalIgnoreCase)
                || name.Equals("openrpc.json", StringComparison.OrdinalIgnoreCase);
     }
+
+    private static bool IsSiblingCandidate(string path) =>
+        path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) && !IsOpenRpcFile(path);
 
     private static Input ReadInput(AdditionalText text, AnalyzerConfigOptionsProvider options, CancellationToken cancellationToken)
     {
@@ -71,7 +89,8 @@ public sealed class OpenRpcClientGenerator : IIncrementalGenerator
         if (input.Namespace is not null)
             settings.Namespace = input.Namespace;
 
-        var result = ClientGenerator.Generate(input.Text, input.Path, settings);
+        var documents = new SiblingDocuments(input.Siblings.Select(s => new KeyValuePair<string, string>(s.Path, s.Text)));
+        var result = ClientGenerator.Generate(input.Text, input.Path, settings, documents.Load);
 
         var text = SourceText.From(input.Text, Encoding.UTF8);
 
@@ -114,9 +133,29 @@ public sealed class OpenRpcClientGenerator : IIncrementalGenerator
         return Diagnostic.Create(descriptor, location, diagnostic.Message + " (JSON path: " + diagnostic.Path + ")");
     }
 
+    private sealed class Sibling : IEquatable<Sibling>
+    {
+        public Sibling(string path, string text)
+        {
+            Path = path;
+            Text = text;
+        }
+
+        public string Path { get; }
+
+        public string Text { get; }
+
+        public bool Equals(Sibling? other) => other is not null && Path == other.Path && Text == other.Text;
+
+        public override bool Equals(object? obj) => Equals(obj as Sibling);
+
+        public override int GetHashCode() => Path.GetHashCode() ^ Text.GetHashCode();
+    }
+
     private sealed class Input : IEquatable<Input>
     {
-        public Input(string path, string text, string? @namespace, string? clientName, bool numberAsDecimal, bool jsonContext)
+        public Input(string path, string text, string? @namespace, string? clientName, bool numberAsDecimal, bool jsonContext,
+            ImmutableArray<Sibling> siblings = default)
         {
             Path = path;
             Text = text;
@@ -124,6 +163,7 @@ public sealed class OpenRpcClientGenerator : IIncrementalGenerator
             ClientName = clientName;
             NumberAsDecimal = numberAsDecimal;
             JsonContext = jsonContext;
+            Siblings = siblings.IsDefault ? ImmutableArray<Sibling>.Empty : siblings;
         }
 
         public string Path { get; }
@@ -138,9 +178,15 @@ public sealed class OpenRpcClientGenerator : IIncrementalGenerator
 
         public bool JsonContext { get; }
 
+        public ImmutableArray<Sibling> Siblings { get; }
+
+        public Input WithSiblings(ImmutableArray<Sibling> siblings) =>
+            new(Path, Text, Namespace, ClientName, NumberAsDecimal, JsonContext, siblings);
+
         public bool Equals(Input? other) =>
             other is not null && Path == other.Path && Text == other.Text && Namespace == other.Namespace
-            && ClientName == other.ClientName && NumberAsDecimal == other.NumberAsDecimal && JsonContext == other.JsonContext;
+            && ClientName == other.ClientName && NumberAsDecimal == other.NumberAsDecimal && JsonContext == other.JsonContext
+            && Siblings.SequenceEqual(other.Siblings);
 
         public override bool Equals(object? obj) => Equals(obj as Input);
 

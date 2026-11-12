@@ -22,6 +22,7 @@ public sealed class GeneratorSteps
     private string _path = "api.openrpc.json";
     private readonly Dictionary<string, string> _metadata = new();
     private BuildResult? _build;
+    private readonly Dictionary<string, string> _siblings = new();
 
     public GeneratorSteps(World world) => _world = world;
 
@@ -62,7 +63,7 @@ public sealed class GeneratorSteps
         """;
 
     private BuildResult Build() =>
-        _build ??= GeneratorHarness.Build(_json, _path, _metadata);
+        _build ??= GeneratorHarness.Build(_json, _path, _metadata, siblings: _siblings);
 
     private Type Contract(string? name = null) => Build().Type(name ?? "I" + (_metadata.GetValueOrDefault("ClientName") ?? "ApiClient"));
 
@@ -94,7 +95,7 @@ public sealed class GeneratorSteps
     [Given(@"^the document defines the methods ""add"", ""getPerson"" and the schema ""Person""$")]
     public void GivenDefinesMethods() => Use(ApiDocument());
 
-    [Then(@"^a record ""(.*)"" is generated$")]
+    [Then(@"^a record ""([^""]*)"" is generated$")]
     public void ThenRecordGenerated(string name)
     {
         var type = Build().Type(name);
@@ -874,5 +875,169 @@ public sealed class GeneratorSteps
 
         Assert.Equal(serverJson, JsonSerializer.Serialize(generated, person, JsonRpcSerializer.DefaultOptions));
         Assert.Equal(serverJson, JsonSerializer.Serialize(JsonSerializer.Deserialize(serverJson, person, JsonRpcSerializer.DefaultOptions), person, JsonRpcSerializer.DefaultOptions));
+    }
+
+    // ---- sibling schema files -----------------------------------------
+
+    private static string ObjectSchema(string? title, string first, string second) =>
+        (title is null ? "" : $"\"title\":\"{title}\",")
+        + $"\"type\":\"object\",\"required\":[\"{first}\"],\"properties\":{{\"{first}\":{{\"type\":\"string\"}},\"{second}\":{{\"type\":\"string\"}}}}";
+
+    [Given(@"^a method ""probe"" whose result schema is (\{.*\})$")]
+    public void GivenProbeWithResult(string schema) => Use(Probe(schema), "api.openrpc.json");
+
+    [Given(@"^the sibling schema ""(.*)"" is included as an AdditionalFile with title ""(.*)"" and properties ""(.*)"" and ""(.*)""$")]
+    public void GivenSibling(string name, string title, string first, string second) =>
+        _siblings[name] = "{" + ObjectSchema(title, first, second) + "}";
+
+    [Given(@"^the sibling schema ""(.*)"" is included as an AdditionalFile with a definition ""(.*)"" with properties ""(.*)"" and ""(.*)""$")]
+    public void GivenSiblingDefinition(string name, string definition, string first, string second) =>
+        _siblings[name] = "{\"definitions\":{\"" + definition + "\":{" + ObjectSchema(null, first, second) + "}}}";
+
+    [Given(@"^the sibling schemas ""a\.schema\.json"" and ""b\.schema\.json"" refer to each other$")]
+    public void GivenCycle()
+    {
+        _siblings["a.schema.json"] =
+            """{"type":"object","properties":{"b":{"$ref":"b.schema.json"},"self":{"$ref":"#"},"name":{"type":"string"}}}""";
+        _siblings["b.schema.json"] =
+            """{"type":"object","properties":{"a":{"$ref":"a.schema.json"},"name":{"type":"string"}}}""";
+    }
+
+    [Then(@"^a record ""(.*)"" with the properties ""(.*)"" and ""(.*)"" is generated$")]
+    public void ThenRecordWithProperties(string record, string first, string second)
+    {
+        var names = Build().Type(record).GetProperties().Select(p => p.Name).ToList();
+        Assert.Contains(first, names);
+        Assert.Contains(second, names);
+    }
+
+    [Then(@"^the records ""(.*)"" and ""(.*)"" are generated$")]
+    public void ThenRecordsGenerated(string first, string second)
+    {
+        Assert.NotNull(Build().Type(first));
+        Assert.NotNull(Build().Type(second));
+    }
+
+    [Then(@"^the probe result type is ""(.*)""$")]
+    public void ThenProbeResultType(string name) =>
+        Assert.Equal(name, ProbeMethod().ReturnType.GetGenericArguments().Single().Name);
+
+    [Then("^no JSONCALL006 diagnostic is reported$")]
+    public void ThenNoUnresolved() =>
+        Assert.DoesNotContain(Build().GeneratorDiagnostics, d => d.Id == "JSONCALL006");
+
+    [Then(@"^a JSONCALL006 warning is reported at the JSON path ""(.*)""$")]
+    public void ThenUnresolvedAt(string path)
+    {
+        var warning = Assert.Single(Build().GeneratorDiagnostics, d => d.Id == "JSONCALL006");
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+        Assert.EndsWith("(JSON path: " + path + ")", warning.GetMessage());
+    }
+
+    [Given("^the project has been built once with the sibling schema$")]
+    public void GivenBuiltWithSibling()
+    {
+        _compilation = GeneratorHarness.CreateCompilation();
+        _texts = new List<AdditionalText> { GeneratorHarness.Text(_path, _json) };
+        _texts.AddRange(_siblings.Select(s => GeneratorHarness.Text(s.Key, s.Value)));
+        _driver = GeneratorHarness.CreateDriver(_texts, _path, track: true).RunGenerators(_compilation);
+    }
+
+    private List<AdditionalText>? _texts;
+
+    [When(@"^the sibling schema gains the property ""(.*)""$")]
+    public void WhenSiblingEdited(string property)
+    {
+        var old = _texts![1];
+        var edited = GeneratorHarness.Text(old.Path, old.GetText()!.ToString().Replace("\"properties\":{", $"\"properties\":{{\"{property}\":{{\"type\":\"string\"}},"));
+        _driver = _driver!.ReplaceAdditionalText(old, edited).RunGenerators(_compilation!);
+        _siblings[old.Path] = edited.GetText()!.ToString();
+        _build = null;
+    }
+
+    [Then(@"^the generator executes again and the record has the property ""(.*)""$")]
+    public void ThenExecutedAgain(string property)
+    {
+        var steps = _driver!.GetRunResult().Results.Single().TrackedSteps[OpenRpcClientGenerator.InputStepName];
+        Assert.Contains(steps.SelectMany(s => s.Outputs), o => o.Reason == IncrementalStepRunReason.Modified);
+        Assert.Contains(property, Build().Type("DaemonEvent").GetProperties().Select(p => p.Name));
+    }
+
+    // ---- sibling schemas through the command line tool ----------------
+
+    [Given(@"^a directory holding ""api\.openrpc\.json"" with a method ""probe"" whose result is (\{.*\})$")]
+    public async Task GivenDirectoryWithDocument(string schema)
+    {
+        var directory = NewDirectory();
+        _world.Values["cliSource"] = directory;
+        await File.WriteAllTextAsync(Path.Combine(directory, "api.openrpc.json"), Probe(schema));
+    }
+
+    [Given(@"^the directory also holds ""(.*)"" with title ""(.*)"" and properties ""(.*)"" and ""(.*)""$")]
+    public async Task GivenDirectorySibling(string name, string title, string first, string second) =>
+        await File.WriteAllTextAsync(Path.Combine((string)_world.Values["cliSource"]!, name), "{" + ObjectSchema(title, first, second) + "}");
+
+    [When(@"^""jsoncall generate api\.openrpc\.json --out \./gen"" is run in that directory$")]
+    public async Task WhenCliRunsInDirectory()
+    {
+        var directory = (string)_world.Values["cliSource"]!;
+        var output = new StringWriter();
+
+        // Absolute paths: the process-wide current directory is shared with scenarios running in parallel.
+        var exit = await JsonCall.Tool.Cli.RunAsync(
+            new[] { "generate", Path.Combine(directory, "api.openrpc.json"), "--out", Path.Combine(directory, "gen") },
+            output, output, CancellationToken.None);
+
+        Assert.True(exit == 0, output.ToString());
+
+        _world.Values["cliOutput"] = output.ToString();
+        _world.Values["cliSource"] = Path.Combine(directory, "gen");
+    }
+
+    [Then(@"^the generated client has a record ""(.*)""$")]
+    public async Task ThenCliRecord(string record)
+    {
+        var generated = await File.ReadAllTextAsync(Path.Combine((string)_world.Values["cliSource"]!, "ApiClient.g.cs"));
+        Assert.Contains("public sealed record " + record + "(", generated);
+    }
+
+    [Then(@"^the tool output reports that ""(.*)"" was loaded$")]
+    public void ThenCliReportsLoaded(string document) =>
+        Assert.Contains("JSONCALL007: Loaded the referenced document '" + document + "'", (string)_world.Values["cliOutput"]!);
+
+    [Then("^the tool output has no JSONCALL006 warning$")]
+    public void ThenCliNoUnresolved() =>
+        Assert.DoesNotContain("JSONCALL006", (string)_world.Values["cliOutput"]!);
+
+    // ---- standard protocol contracts (LSP, ACP) ------------------------
+
+    [Given(@"^the contract ""(.*)"" with its sibling schemas (.*)$")]
+    public void GivenContract(string document, string siblings)
+    {
+        // The AdditionalFiles keep the checked-in layout, so the document's relative $refs resolve by exact path.
+        foreach (var sibling in System.Text.RegularExpressions.Regex.Matches(siblings, "\"([^\"]+)\"").Select(m => m.Groups[1].Value))
+            _siblings[sibling] = ContractData.Read(sibling);
+
+        Use(ContractData.Read(document), document);
+    }
+
+    [Given(@"^the client is named ""(.*)"" in the namespace ""(.*)""$")]
+    public void GivenClientName(string client, string ns)
+    {
+        _metadata["ClientName"] = client;
+        _metadata["Namespace"] = ns;
+        _build = null;
+    }
+
+    [Then(@"^the generated client matches the checked-in golden ""(.*)"" byte for byte$")]
+    public void ThenMatchesGolden(string golden)
+    {
+        var actual = System.Text.Encoding.UTF8.GetBytes(Build().AllSource);
+
+        // Set JSONCALL_UPDATE_GOLDEN=1 to rewrite the checked-in file after an intentional change, then review the diff.
+        if (Environment.GetEnvironmentVariable("JSONCALL_UPDATE_GOLDEN") == "1")
+            File.WriteAllBytes(ContractData.Resolve(ContractData.SourceDirectory(), golden), actual);
+
+        Assert.Equal(ContractData.ReadBytes(golden), actual);
     }
 }

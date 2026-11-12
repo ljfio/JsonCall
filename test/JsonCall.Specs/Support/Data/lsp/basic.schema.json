@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LSP basic structures",
+  "description": "Basic structures of the Language Server Protocol 3.17, written as JSON Schema from the specification's meta model.",
+  "definitions": {
+    "Position": {
+      "description": "Position in a text document expressed as zero-based line and zero-based character offset.",
+      "type": "object",
+      "required": ["line", "character"],
+      "properties": {
+        "line": { "type": "integer", "format": "uint32", "minimum": 0 },
+        "character": { "type": "integer", "format": "uint32", "minimum": 0 }
+      }
+    },
+    "Range": {
+      "description": "A range in a text document expressed as (zero-based) start and end positions.",
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "$ref": "#/definitions/Position" },
+        "end": { "$ref": "#/definitions/Position" }
+      }
+    },
+    "Location": {
+      "description": "Represents a location inside a resource, such as a line inside a text file.",
+      "type": "object",
+      "required": ["uri", "range"],
+      "properties": {
+        "uri": { "type": "string", "format": "uri" },
+        "range": { "$ref": "#/definitions/Range" }
+      }
+    },
+    "TextDocumentIdentifier": {
+      "description": "A literal to identify a text document in the client.",
+      "type": "object",
+      "required": ["uri"],
+      "properties": {
+        "uri": { "type": "string", "format": "uri" }
+      }
+    },
+    "TextDocumentItem": {
+      "description": "An item to transfer a text document from the client to the server.",
+      "type": "object",
+      "required": ["uri", "languageId", "version", "text"],
+      "properties": {
+        "uri": { "type": "string", "format": "uri" },
+        "languageId": { "type": "string" },
+        "version": { "type": "integer", "format": "int32" },
+        "text": { "type": "string" }
+      }
+    },
+    "MarkupContent": {
+      "description": "A string value whose kind tells the client how to render it.",
+      "type": "object",
+      "required": ["kind", "value"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["plaintext", "markdown"] },
+        "value": { "type": "string" }
+      }
+    }
+  }
+}

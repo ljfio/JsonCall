@@ -294,7 +294,7 @@ public static class Connections
 
     public static async Task<Connection> ConnectAsync(string transport, TestState state, string serializerName = "json",
         IJsonRpcHandler? clientHandler = null, TimeSpan? timeout = null, int clientStreamBuffer = 64,
-        int transportCapacity = 0)
+        int transportCapacity = 0, MessageFraming framing = MessageFraming.ContentLength)
     {
         var serializer = Serializers.ByName(serializerName);
 
@@ -326,10 +326,14 @@ public static class Connections
                 };
             }
 
-            case "tcp":
+            case "tcp" or "uds":
             {
                 var server = CreateServer(state);
-                var listener = new TcpMessageListener(IPAddress.Loopback, 0);
+                var socketPath = transport == "uds" ? Path.Combine(Path.GetTempPath(), "jc-" + Guid.NewGuid().ToString("N")[..10] + ".sock") : null;
+
+                IMessageListener listener = socketPath is null
+                    ? new TcpListenerAdapter(new TcpMessageListener(IPAddress.Loopback, 0, framing))
+                    : new UnixListenerAdapter(new UnixSocketMessageListener(socketPath, framing));
                 var accepted = new TaskCompletionSource<JsonRpcPeer>();
                 var peers = new List<JsonRpcPeer>();
                 var cts = new CancellationTokenSource();
@@ -351,7 +355,11 @@ public static class Connections
                     }
                 });
 
-                var recording = new RecordingTransport(await TcpMessageTransport.ConnectAsync("127.0.0.1", listener.Port), serializer);
+                var clientTransport = socketPath is null
+                    ? await TcpMessageTransport.ConnectAsync("127.0.0.1", listener.Port, framing)
+                    : await UnixSocketMessageTransport.ConnectAsync(socketPath, framing);
+
+                var recording = new RecordingTransport(clientTransport, serializer);
                 var client = new JsonRpcClient(recording, ClientOptions());
                 var serverPeer = await accepted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
@@ -387,8 +395,8 @@ public static class Connections
                 var toClient = new Pipe();
                 var server = CreateServer(state);
 
-                var serverTransport = new StreamMessageTransport(toServer.Reader.AsStream(), toClient.Writer.AsStream());
-                var clientTransport = new StreamMessageTransport(toClient.Reader.AsStream(), toServer.Writer.AsStream());
+                var serverTransport = new StreamMessageTransport(toServer.Reader.AsStream(), toClient.Writer.AsStream(), framing: framing);
+                var clientTransport = new StreamMessageTransport(toClient.Reader.AsStream(), toServer.Writer.AsStream(), framing: framing);
 
                 var serverPeer = server.Attach(serverTransport, serializer);
                 var recording = new RecordingTransport(clientTransport, serializer);
@@ -462,6 +470,40 @@ public static class Connections
                 throw new ArgumentException($"Unknown transport '{transport}'");
         }
     }
+}
+
+/// <summary>Lets the connection helper treat TCP and Unix domain socket listeners alike.</summary>
+public interface IMessageListener : IDisposable
+{
+    int Port { get; }
+
+    Task<IMessageTransport> AcceptAsync(CancellationToken cancellationToken = default);
+}
+
+public sealed class TcpListenerAdapter : IMessageListener
+{
+    private readonly TcpMessageListener _inner;
+
+    public TcpListenerAdapter(TcpMessageListener inner) => _inner = inner;
+
+    public int Port => _inner.Port;
+
+    public Task<IMessageTransport> AcceptAsync(CancellationToken cancellationToken = default) => _inner.AcceptAsync(cancellationToken);
+
+    public void Dispose() => _inner.Dispose();
+}
+
+public sealed class UnixListenerAdapter : IMessageListener
+{
+    private readonly UnixSocketMessageListener _inner;
+
+    public UnixListenerAdapter(UnixSocketMessageListener inner) => _inner = inner;
+
+    public int Port => 0;
+
+    public Task<IMessageTransport> AcceptAsync(CancellationToken cancellationToken = default) => _inner.AcceptAsync(cancellationToken);
+
+    public void Dispose() => _inner.Dispose();
 }
 
 public static class Wait

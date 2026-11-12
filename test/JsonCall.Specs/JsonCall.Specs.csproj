@@ -42,7 +42,8 @@
 
     <ItemGroup>
         <None Include="Support\echo_server.py" CopyToOutputDirectory="PreserveNewest" />
-        <None Include="Support\Data\*.json" CopyToOutputDirectory="PreserveNewest" />
+        <None Include="Support\Data\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+        <None Include="Support\Data\**\*.txt" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
     <!--

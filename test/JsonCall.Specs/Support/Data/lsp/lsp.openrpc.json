@@ -1,0 +1,124 @@
+{
+  "openrpc": "1.2.6",
+  "info": {
+    "title": "Language Server Protocol",
+    "version": "3.17.0",
+    "description": "A subset of the Language Server Protocol 3.17 written as OpenRPC, with the structures in sibling JSON Schema files. Each LSP params object becomes by-name params."
+  },
+  "methods": [
+    {
+      "name": "initialize",
+      "summary": "The first request from the client to the server.",
+      "paramStructure": "by-name",
+      "params": [
+        { "name": "processId", "required": true, "schema": { "type": ["integer", "null"], "format": "int32" } },
+        { "name": "rootUri", "required": true, "schema": { "type": ["string", "null"], "format": "uri" } },
+        { "name": "capabilities", "required": true, "schema": { "$ref": "#/components/schemas/ClientCapabilities" } }
+      ],
+      "result": { "name": "result", "schema": { "$ref": "#/components/schemas/InitializeResult" } }
+    },
+    {
+      "name": "textDocument/didOpen",
+      "summary": "Sent from the client to the server to signal newly opened text documents.",
+      "paramStructure": "by-name",
+      "params": [
+        { "name": "textDocument", "required": true, "schema": { "$ref": "basic.schema.json#/definitions/TextDocumentItem" } }
+      ]
+    },
+    {
+      "name": "textDocument/hover",
+      "summary": "Requests hover information at a given text document position.",
+      "paramStructure": "by-name",
+      "params": [
+        { "name": "textDocument", "required": true, "schema": { "$ref": "basic.schema.json#/definitions/TextDocumentIdentifier" } },
+        { "name": "position", "required": true, "schema": { "$ref": "basic.schema.json#/definitions/Position" } }
+      ],
+      "result": { "name": "result", "schema": { "$ref": "#/components/schemas/Hover" } }
+    },
+    {
+      "name": "textDocument/definition",
+      "summary": "Resolves the definition location of a symbol at a given text document position.",
+      "paramStructure": "by-name",
+      "params": [
+        { "name": "textDocument", "required": true, "schema": { "$ref": "basic.schema.json#/definitions/TextDocumentIdentifier" } },
+        { "name": "position", "required": true, "schema": { "$ref": "basic.schema.json#/definitions/Position" } }
+      ],
+      "result": { "name": "result", "schema": { "type": "array", "items": { "$ref": "basic.schema.json#/definitions/Location" } } }
+    },
+    {
+      "name": "window/logMessage",
+      "summary": "Sent from the server to the client to ask the client to log a message.",
+      "paramStructure": "by-name",
+      "params": [
+        { "name": "type", "required": true, "schema": { "description": "1 = Error, 2 = Warning, 3 = Info, 4 = Log, 5 = Debug.", "type": "integer", "format": "int32" } },
+        { "name": "message", "required": true, "schema": { "type": "string" } }
+      ]
+    },
+    {
+      "name": "textDocument/publishDiagnostics",
+      "summary": "Sent from the server to the client to signal results of validation runs.",
+      "paramStructure": "by-name",
+      "params": [
+        { "name": "uri", "required": true, "schema": { "type": "string", "format": "uri" } },
+        { "name": "version", "required": false, "schema": { "type": "integer", "format": "int32" } },
+        { "name": "diagnostics", "required": true, "schema": { "type": "array", "items": { "$ref": "diagnostic.schema.json" } } }
+      ]
+    },
+    {
+      "name": "$/progress",
+      "summary": "Reports progress against a token.",
+      "paramStructure": "by-name",
+      "params": [
+        { "name": "token", "required": true, "schema": { "description": "A ProgressToken is integer | string in LSP; this subset uses strings.", "type": "string" } },
+        { "name": "value", "required": true, "schema": { "$ref": "window.schema.json#/definitions/WorkDoneProgress" } }
+      ]
+    }
+  ],
+  "components": {
+    "schemas": {
+      "ClientCapabilities": {
+        "type": "object",
+        "properties": {
+          "general": {
+            "type": "object",
+            "properties": {
+              "positionEncodings": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      },
+      "InitializeResult": {
+        "type": "object",
+        "required": ["capabilities"],
+        "properties": {
+          "capabilities": { "$ref": "#/components/schemas/ServerCapabilities" },
+          "serverInfo": { "$ref": "#/components/schemas/ServerInfo" }
+        }
+      },
+      "ServerCapabilities": {
+        "type": "object",
+        "properties": {
+          "positionEncoding": { "type": "string" },
+          "hoverProvider": { "type": "boolean" },
+          "definitionProvider": { "type": "boolean" }
+        }
+      },
+      "ServerInfo": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "version": { "type": "string" }
+        }
+      },
+      "Hover": {
+        "type": "object",
+        "required": ["contents"],
+        "properties": {
+          "contents": { "$ref": "basic.schema.json#/definitions/MarkupContent" },
+          "range": { "$ref": "basic.schema.json#/definitions/Range" }
+        }
+      }
+    }
+  }
+}

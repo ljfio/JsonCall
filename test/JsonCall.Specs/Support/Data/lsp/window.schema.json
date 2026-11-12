@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LSP window features",
+  "description": "Work done progress payloads of the Language Server Protocol 3.17, discriminated by \"kind\".",
+  "definitions": {
+    "WorkDoneProgress": {
+      "oneOf": [
+        { "$ref": "#/definitions/WorkDoneProgressBegin" },
+        { "$ref": "#/definitions/WorkDoneProgressReport" },
+        { "$ref": "#/definitions/WorkDoneProgressEnd" }
+      ]
+    },
+    "WorkDoneProgressBegin": {
+      "type": "object",
+      "required": ["kind", "title"],
+      "properties": {
+        "kind": { "const": "begin" },
+        "title": { "type": "string" },
+        "cancellable": { "type": "boolean" },
+        "message": { "type": "string" },
+        "percentage": { "type": "integer", "format": "uint32", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "WorkDoneProgressReport": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "const": "report" },
+        "cancellable": { "type": "boolean" },
+        "message": { "type": "string" },
+        "percentage": { "type": "integer", "format": "uint32", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "WorkDoneProgressEnd": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "const": "end" },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}

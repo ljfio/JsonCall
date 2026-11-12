@@ -25,9 +25,9 @@ internal sealed partial class ClientGenerator
 
     private ClientGenerator(GenSettings settings) => _settings = settings;
 
-    public static GenResult Generate(string text, string fileName, GenSettings settings)
+    public static GenResult Generate(string text, string fileName, GenSettings settings, DocumentLoader? loader = null)
     {
-        var generator = new ClientGenerator(settings) { _fileName = fileName };
+        var generator = new ClientGenerator(settings) { _fileName = fileName, _loader = loader };
 
         try
         {
@@ -45,8 +45,17 @@ internal sealed partial class ClientGenerator
         return generator._result;
     }
 
-    private void Warn(string id, GenSeverity severity, string message, string path, JNode? node) =>
+    private void Warn(string id, GenSeverity severity, string message, string path, JNode? node)
+    {
+        // Inside a referenced document the positions mean nothing in the main file, so point at the $ref that led there.
+        if (_anchor is not null)
+        {
+            path = _anchorPath + " -> " + path;
+            node = _anchor;
+        }
+
         _result.Diagnostics.Add(new GenDiagnostic(id, severity, message, path, node));
+    }
 
     // ---- declarations -------------------------------------------------
 
@@ -333,7 +342,7 @@ internal sealed partial class ClientGenerator
 
         if (schema.GetString("$ref") is { } reference)
         {
-            if (reference.StartsWith("#/components/schemas/", StringComparison.Ordinal))
+            if (IsOwnComponent(reference))
             {
                 var name = reference.Substring("#/components/schemas/".Length);
 
@@ -341,9 +350,15 @@ internal sealed partial class ClientGenerator
                     return MapComponent(name);
             }
 
-            Warn(DiagnosticIds.UnresolvedReference, GenSeverity.Warning,
-                $"The reference '{reference}' cannot be resolved; the value is generated as JsonElement.", path + ".$ref",
-                schema.Get("$ref"));
+            if (!IsOwnComponent(reference) && MapExternalReference(schema, reference, path, hint) is { } external)
+                return external;
+
+            if (IsOwnComponent(reference))
+            {
+                Warn(DiagnosticIds.UnresolvedReference, GenSeverity.Warning,
+                    $"The reference '{reference}' cannot be resolved; the value is generated as JsonElement.", path + ".$ref",
+                    schema.Get("$ref"));
+            }
 
             return "JsonElement";
         }
@@ -533,12 +548,24 @@ internal sealed partial class ClientGenerator
 
     private void CollectInto(RecordDecl record, JNode part, string path, HashSet<string> visited)
     {
-        if (part.GetString("$ref") is { } reference && reference.StartsWith("#/components/schemas/", StringComparison.Ordinal))
+        if (part.GetString("$ref") is { } reference)
         {
-            var name = reference.Substring("#/components/schemas/".Length);
+            var key = IsOwnComponent(reference) ? reference : CurrentKey + "|" + reference;
 
-            if (_schemas?.Get(name) is { } target && visited.Add(name))
-                CollectInto(record, target, "components.schemas." + name, visited);
+            if (ResolveReferenceNode(reference, out var document, part, path) is { } target && visited.Add(key))
+            {
+                var previous = _current;
+                _current = document ?? (IsOwnComponent(reference) ? null : _current);
+
+                try
+                {
+                    CollectInto(record, target, IsOwnComponent(reference) ? "components.schemas." + reference.Substring("#/components/schemas/".Length) : path, visited);
+                }
+                finally
+                {
+                    _current = previous;
+                }
+            }
 
             return;
         }
@@ -592,8 +619,8 @@ internal sealed partial class ClientGenerator
 
     private JNode? ResolveSchema(JNode node)
     {
-        if (node.GetString("$ref") is { } reference && reference.StartsWith("#/components/schemas/", StringComparison.Ordinal))
-            return _schemas?.Get(reference.Substring("#/components/schemas/".Length));
+        if (node.GetString("$ref") is { } reference)
+            return ResolveReferenceNode(reference, out _);
 
         return node;
     }
@@ -740,10 +767,9 @@ internal sealed partial class ClientGenerator
             var variant = variants[i];
             string derivedName;
 
-            if (variant.GetString("$ref") is { } reference && reference.StartsWith("#/components/schemas/", StringComparison.Ordinal))
+            if (variant.GetString("$ref") is not null)
             {
-                var component = reference.Substring("#/components/schemas/".Length);
-                derivedName = MapComponent(component);
+                derivedName = Map(variant, path + "[" + i + "]", baseName + Naming.Pascal(values[i]));
             }
             else
             {

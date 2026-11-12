@@ -61,24 +61,31 @@ public static class GeneratorHarness
             References.Value,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
 
+    public static AdditionalText Text(string path, string content) => new InMemoryAdditionalText(path, content);
+
     public static GeneratorDriver CreateDriver(string json, string path, IDictionary<string, string>? metadata = null,
-        bool track = false)
+        bool track = false, IDictionary<string, string>? siblings = null) =>
+        CreateDriver(
+            new[] { Text(path, json) }.Concat((siblings ?? new Dictionary<string, string>()).Select(s => Text(s.Key, s.Value))).ToList(),
+            path, metadata, track);
+
+    public static GeneratorDriver CreateDriver(IReadOnlyList<AdditionalText> texts, string path,
+        IDictionary<string, string>? metadata = null, bool track = false)
     {
-        var text = new InMemoryAdditionalText(path, json);
         var options = new TestOptionsProvider(path, metadata);
 
         return CSharpGeneratorDriver.Create(
             ImmutableArray.Create(new OpenRpcClientGenerator().AsSourceGenerator()),
-            new[] { text },
+            texts,
             new CSharpParseOptions(LanguageVersion.Latest),
             options,
             new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None, trackIncrementalGeneratorSteps: track));
     }
 
     public static BuildResult Build(string json, string path = "api.openrpc.json", IDictionary<string, string>? metadata = null,
-        bool compile = true)
+        bool compile = true, IDictionary<string, string>? siblings = null)
     {
-        var driver = CreateDriver(json, path, metadata)
+        var driver = CreateDriver(json, path, metadata, siblings: siblings)
             .RunGeneratorsAndUpdateCompilation(CreateCompilation(), out var output, out var generatorDiagnostics);
 
         var run = driver.GetRunResult();
