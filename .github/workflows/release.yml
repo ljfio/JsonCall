@@ -1,0 +1,73 @@
+name: Release
+
+# Pushing a tag such as v0.1.0-preview.1 or v1.0.0 builds, tests and packs that commit, publishes the packages to
+# NuGet and creates the GitHub Release. MinVer turns the tag into the package version. See
+# docs/decisions/0010-versioning-and-release.md.
+
+on:
+  push:
+    tags: [ "v*" ]
+
+permissions:
+  contents: write               # create the GitHub Release
+  id-token: write               # NuGet trusted publishing (OIDC)
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: nuget          # add required reviewers in Settings > Environments to approve each publish
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Restore
+      run: dotnet restore JsonCall.slnx
+
+    - name: Build
+      run: dotnet build JsonCall.slnx --no-restore --configuration Release
+
+    - name: Test
+      run: dotnet test JsonCall.slnx --no-build --configuration Release
+
+    - name: Pack
+      run: dotnet pack JsonCall.slnx --no-build --configuration Release --output ./artifacts
+
+    # Fail before publishing anything if MinVer did not take the version from this tag.
+    - name: Check version matches tag
+      run: |
+        expected="${GITHUB_REF_NAME#v}"
+        for pkg in ./artifacts/*.nupkg; do
+          case "$(basename "$pkg")" in
+            *".${expected}.nupkg") ;;
+            *) echo "::error::$(basename "$pkg") does not match tag ${GITHUB_REF_NAME}"; exit 1 ;;
+          esac
+        done
+
+    - name: NuGet login (trusted publishing)
+      uses: NuGet/login@v1
+      id: nuget
+      with:
+        user: ${{ vars.NUGET_USER }}
+
+    - name: Push to NuGet
+      run: >
+        dotnet nuget push "./artifacts/*.nupkg"
+        --api-key "${{ steps.nuget.outputs.NUGET_API_KEY }}"
+        --source https://api.nuget.org/v3/index.json
+        --skip-duplicate
+
+    # Notes are generated from merged pull requests and closed issues; edit them on GitHub afterwards.
+    - name: Create GitHub Release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        prerelease=""
+        case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
+        gh release create "$GITHUB_REF_NAME" ./artifacts/*.nupkg --verify-tag --generate-notes $prerelease

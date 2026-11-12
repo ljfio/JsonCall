@@ -94,6 +94,19 @@ Body: `# Requirements` (each `**FR-AREA-NN** statement`, one or two sentences), 
 5. **Bundle.** Run `okf index docs` and `okf validate docs`.
 6. **Commit** referencing the issue (`Fixes #12`).
 
+## Releasing
+
+Versions come from git tags through MinVer; never set `Version` in a project file
+(`docs/decisions/0010-versioning-and-release.md`). To release, tag `main` and push the tag:
+
+```sh
+git tag v0.1.0-preview.1
+git push origin v0.1.0-preview.1
+```
+
+`.github/workflows/release.yml` tests, packs, publishes to NuGet and creates the GitHub Release. Edit the generated
+notes there.
+
 ## Conventions
 
 - Error codes, wire names and OpenRPC extensions (`x-jsoncall-*`) are public contracts. Changing one is a decision.

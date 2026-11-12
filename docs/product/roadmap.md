@@ -60,15 +60,17 @@ covered by a scenario yet; each should get one. Each is tracked as the GitHub is
 
 ### Ship
 
-- [x] Pre-release version (`0.1.0-preview.1`) instead of the SDK default `1.0.0`.
+- [x] Versions from git tags with MinVer; untagged builds are pre-releases ([0010](../decisions/0010-versioning-and-release.md)).
 - [x] XML documentation files in the packages.
 - [x] Source Link, embedded symbols, deterministic CI builds.
 - [x] `JsonCall.Tool` as the tool's package id (it was `jsoncall`).
 - [x] User documentation: getting started, transports, streaming, OpenRPC, comparison.
 - [ ] Reserve the `JsonCall.` prefix on NuGet.
-- [ ] Release workflow: a tag builds in Release, packs, and publishes with NuGet trusted publishing.
+- [x] Release workflow: a `v*` tag builds in Release, packs, publishes with NuGet trusted publishing and creates the
+  GitHub Release.
+- [ ] Trusted publishing policy on nuget.org, `NUGET_USER` variable and `nuget` environment on GitHub.
 - [ ] CI matrix on Linux, macOS and Windows. Today only Linux runs, and the Unix socket scenarios skip on Windows.
-- [ ] Release notes on GitHub Releases, generated from the merged pull requests and closed issues, then edited.
+- [x] Release notes on GitHub Releases, generated from the merged pull requests and closed issues, then edited.
 - [ ] `samples/`: an ASP.NET Core service with a generated client, and a stdio server.
 - [ ] Package icon. A short README per package, so each NuGet page opens with that package's own quick start.
 

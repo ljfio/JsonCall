@@ -13,14 +13,20 @@
     </PropertyGroup>
 
     <!--
-      Version. Pre-release until the milestones up to 1.0 in docs/product/roadmap.md are met: the streaming wire
-      convention is still a draft and the public API is not frozen. -p:VersionSuffix=preview.2 overrides the suffix;
-      delete the VersionSuffix line to cut a stable release.
+      Version comes from git tags, through MinVer. Tag a commit v0.1.0-preview.1 and that commit builds as
+      0.1.0-preview.1. Untagged commits after it build as 0.1.0-preview.1.N (N commits since the tag); before any tag
+      they build as 0.1.0-preview.0.N. A tag without a suffix (v1.0.0) is a stable release. MinVer needs the full
+      history: CI checks out with fetch-depth 0. See docs/decisions/0010-versioning-and-release.md.
     -->
     <PropertyGroup>
-        <VersionPrefix>0.1.0</VersionPrefix>
-        <VersionSuffix>preview.1</VersionSuffix>
+        <MinVerTagPrefix>v</MinVerTagPrefix>
+        <MinVerMinimumMajorMinor>0.1</MinVerMinimumMajorMinor>
+        <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
     </PropertyGroup>
+
+    <ItemGroup Condition="$(MSBuildProjectDirectory.Replace('\', '/').Contains('/src/'))">
+        <PackageReference Include="MinVer" Version="8.0.0" PrivateAssets="all" />
+    </ItemGroup>
 
     <!-- Source Link, embedded symbols and reproducible builds, so consumers can step into the library. -->
     <PropertyGroup>
