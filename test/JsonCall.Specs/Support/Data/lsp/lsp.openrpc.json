@@ -48,6 +48,7 @@
     {
       "name": "window/logMessage",
       "summary": "Sent from the server to the client to ask the client to log a message.",
+      "x-jsoncall-direction": "server-to-client",
       "paramStructure": "by-name",
       "params": [
         { "name": "type", "required": true, "schema": { "description": "1 = Error, 2 = Warning, 3 = Info, 4 = Log, 5 = Debug.", "type": "integer", "format": "int32" } },
@@ -57,6 +58,7 @@
     {
       "name": "textDocument/publishDiagnostics",
       "summary": "Sent from the server to the client to signal results of validation runs.",
+      "x-jsoncall-direction": "server-to-client",
       "paramStructure": "by-name",
       "params": [
         { "name": "uri", "required": true, "schema": { "type": "string", "format": "uri" } },
@@ -67,6 +69,7 @@
     {
       "name": "$/progress",
       "summary": "Reports progress against a token.",
+      "x-jsoncall-direction": "server-to-client",
       "paramStructure": "by-name",
       "params": [
         { "name": "token", "required": true, "schema": { "description": "A ProgressToken is integer | string in LSP; this subset uses strings.", "type": "string" } },

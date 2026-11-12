@@ -81,12 +81,18 @@ document's directory. A source generator can only see `AdditionalFiles`, so add 
 ### Pushed notifications
 
 A generated method with no result (for example `EventAsync`) is a **call** that sends a notification to the
-server. It is not a subscription. To receive notifications the server pushes, register a handler on the peer
-the client wraps:
+server. It is not a subscription. To receive notifications the server pushes, mark the method in the document with
+`"x-jsoncall-direction": "server-to-client"`. The generator then emits a typed `On<Name>` handler on the client
+instead of a call, and leaves the method off the call interface:
 
 ```csharp
-peer.OnNotification<Event>("event", e => Console.WriteLine(e));
+var client = new LanguageServerClient(peer);
+client.OnTextDocumentPublishDiagnostics((uri, version, diagnostics) => Show(uri, diagnostics));
 ```
+
+Handler arguments follow the document's param order. Params are read by name or by position, and omitted optional
+params arrive as `null`. Registering a handler again
+replaces the previous one. Without the marker, or with a lower-level peer, use `peer.OnNotification("event", ...)`.
 
 ## Broadcasting from a daemon
 

@@ -32,12 +32,14 @@ internal sealed partial class ClientGenerator
         public readonly List<ParamModel> Params = new();
         public string? ResultType;
         public bool IsStream;
+        public bool IsPush;
         public bool Deprecated;
         public string? Structure;
         public readonly List<ErrorModel> Errors = new();
     }
 
     private readonly HashSet<string> _methodNames = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _pushNames = new(StringComparer.Ordinal);
 
     private MethodModel BuildMethod(JNode method, string path)
     {
@@ -51,15 +53,22 @@ internal sealed partial class ClientGenerator
             IsStream = method.GetBool("x-jsoncall-stream")
         };
 
+        // A result-less method marked "server-to-client" is pushed by the server: the client subscribes, not calls.
+        model.IsPush = method.GetString("x-jsoncall-direction") == "server-to-client"
+                       && method.Get("result") is not { IsObject: true };
+
         var lastSegment = wire.Substring(wire.LastIndexOf('.') + 1);
-        var name = Naming.Pascal(lastSegment) + "Async";
+        var prefix = model.IsPush ? "On" : "";
+        var suffix = model.IsPush ? "" : "Async";
+        var names = model.IsPush ? _pushNames : _methodNames;
+        var name = prefix + Naming.Pascal(lastSegment) + suffix;
 
-        if (!_methodNames.Add(name))
+        if (!names.Add(name))
         {
-            name = Naming.Pascal(wire) + "Async";
+            name = prefix + Naming.Pascal(wire) + suffix;
 
-            for (var i = 2; !_methodNames.Add(name); i++)
-                name = Naming.Pascal(wire) + i + "Async";
+            for (var i = 2; !names.Add(name); i++)
+                name = prefix + Naming.Pascal(wire) + i + suffix;
         }
 
         model.CsName = name;
@@ -428,7 +437,7 @@ internal sealed partial class ClientGenerator
         sb.Append("    public interface I").Append(clientName).AppendLine();
         sb.AppendLine("    {");
 
-        foreach (var m in methods)
+        foreach (var m in methods.Where(m => !m.IsPush))
         {
             Doc(sb, "        ", m.Summary,
                 m.Params.Select(p => new KeyValuePair<string, string?>(p.CsName, p.Doc)));
@@ -500,7 +509,59 @@ internal sealed partial class ClientGenerator
         sb.AppendLine("            return JsonRpcParams.ByPosition(_options, positional);");
         sb.AppendLine("        }");
 
-        foreach (var m in methods)
+        if (methods.Any(m => m.IsPush))
+        {
+            sb.AppendLine();
+            sb.AppendLine("        private static T? Pushed<T>(JsonElement? @params, int position, string name, JsonSerializerOptions options)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            JsonElement? value = null;");
+            sb.AppendLine();
+            sb.AppendLine("            if (@params is { ValueKind: JsonValueKind.Array } array)");
+            sb.AppendLine("            {");
+            sb.AppendLine("                if (position < array.GetArrayLength())");
+            sb.AppendLine("                    value = array[position];");
+            sb.AppendLine("            }");
+            sb.AppendLine("            else if (@params is { ValueKind: JsonValueKind.Object } obj && obj.TryGetProperty(name, out var named))");
+            sb.AppendLine("            {");
+            sb.AppendLine("                value = named;");
+            sb.AppendLine("            }");
+            sb.AppendLine();
+            sb.AppendLine("            return value is { ValueKind: not JsonValueKind.Null } present ? present.Deserialize<T>(options) : default;");
+            sb.AppendLine("        }");
+        }
+
+        foreach (var m in methods.Where(m => m.IsPush))
+        {
+            sb.AppendLine();
+            Doc(sb, "        ", m.Summary ?? "Handles the server-pushed notification '" + m.Wire + "'.",
+                m.Params.Select(p => new KeyValuePair<string, string?>(p.CsName, p.Doc)));
+            sb.AppendLine("        /// <remarks>Pushed by the server. Registering again replaces the previous handler.</remarks>");
+
+            if (m.Deprecated)
+                sb.AppendLine("        [Obsolete]");
+
+            // An optional value-type param must be read as Nullable<T>: an unconstrained T? is still T, so an omitted
+            // int would otherwise arrive as 0 instead of null.
+            static string ArgumentType(ParamModel p) => p.Required ? p.Type : Nullable(p.Type);
+
+            var handlerType = m.Params.Count == 0
+                ? "Action"
+                : "Action<" + string.Join(", ", m.Params.Select(ArgumentType)) + ">";
+
+            var arguments = string.Join(", ", m.Params.Select((p, i) =>
+                "Pushed<" + ArgumentType(p) + ">(p, " + i.ToString(CultureInfo.InvariantCulture) + ", " + Naming.Literal(p.Wire) + ", _options)"
+                + (p.Required && !p.Type.EndsWith("?", StringComparison.Ordinal) ? "!" : "")));
+
+            sb.Append("        public void ").Append(m.CsName).Append('(').Append(handlerType).AppendLine(" handler)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            if (handler is null)");
+            sb.AppendLine("                throw new ArgumentNullException(nameof(handler));");
+            sb.AppendLine();
+            sb.Append("            _peer.OnNotification(").Append(Naming.Literal(m.Wire)).Append(", p => handler(").Append(arguments).AppendLine("));");
+            sb.AppendLine("        }");
+        }
+
+        foreach (var m in methods.Where(m => !m.IsPush))
         {
             sb.AppendLine();
             sb.Append("        public ");

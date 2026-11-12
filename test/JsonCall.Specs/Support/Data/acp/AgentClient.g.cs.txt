@@ -224,13 +224,6 @@ namespace Acp
         [JsonRpcNotification]
         Task SessionCancelAsync(string sessionId, CancellationToken cancellationToken = default);
 
-        /// <summary>
-        /// Reports progress on a session to the client (a notification from the agent).
-        /// </summary>
-        [JsonRpcMethod("session/update")]
-        [JsonRpcNotification]
-        Task SessionUpdateAsync(string sessionId, SessionUpdate update, CancellationToken cancellationToken = default);
-
     }
 
     /// <summary>A client for the API, over any <see cref="JsonRpcPeer"/> (any transport and serializer).</summary>
@@ -279,6 +272,35 @@ namespace Acp
             return JsonRpcParams.ByPosition(_options, positional);
         }
 
+        private static T? Pushed<T>(JsonElement? @params, int position, string name, JsonSerializerOptions options)
+        {
+            JsonElement? value = null;
+
+            if (@params is { ValueKind: JsonValueKind.Array } array)
+            {
+                if (position < array.GetArrayLength())
+                    value = array[position];
+            }
+            else if (@params is { ValueKind: JsonValueKind.Object } obj && obj.TryGetProperty(name, out var named))
+            {
+                value = named;
+            }
+
+            return value is { ValueKind: not JsonValueKind.Null } present ? present.Deserialize<T>(options) : default;
+        }
+
+        /// <summary>
+        /// Reports progress on a session to the client (a notification from the agent).
+        /// </summary>
+        /// <remarks>Pushed by the server. Registering again replaces the previous handler.</remarks>
+        public void OnSessionUpdate(Action<string, SessionUpdate> handler)
+        {
+            if (handler is null)
+                throw new ArgumentNullException(nameof(handler));
+
+            _peer.OnNotification("session/update", p => handler(Pushed<string>(p, 0, "sessionId", _options)!, Pushed<SessionUpdate>(p, 1, "update", _options)!));
+        }
+
         public async Task<InitializeResponse> InitializeAsync(long protocolVersion, ClientCapabilities? clientCapabilities = null, CancellationToken cancellationToken = default)
         {
             var @params = BuildParams(JsonRpcParamStyle.ByName, new[] { "protocolVersion", "clientCapabilities" }, new object?[] { protocolVersion, clientCapabilities }, new[] { false, true });
@@ -304,12 +326,6 @@ namespace Acp
         {
             var @params = BuildParams(JsonRpcParamStyle.ByName, new[] { "sessionId" }, new object?[] { sessionId }, new[] { false });
             await _peer.NotifyAsync("session/cancel", @params, cancellationToken).ConfigureAwait(false);
-        }
-
-        public async Task SessionUpdateAsync(string sessionId, SessionUpdate update, CancellationToken cancellationToken = default)
-        {
-            var @params = BuildParams(JsonRpcParamStyle.ByName, new[] { "sessionId", "update" }, new object?[] { sessionId, update }, new[] { false, false });
-            await _peer.NotifyAsync("session/update", @params, cancellationToken).ConfigureAwait(false);
         }
     }
 }

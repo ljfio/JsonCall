@@ -153,27 +153,6 @@ namespace Lsp
         [JsonRpcMethod("textDocument/definition")]
         Task<IReadOnlyList<Location>> TextDocumentDefinitionAsync(TextDocumentIdentifier textDocument, Position position, CancellationToken cancellationToken = default);
 
-        /// <summary>
-        /// Sent from the server to the client to ask the client to log a message.
-        /// </summary>
-        [JsonRpcMethod("window/logMessage")]
-        [JsonRpcNotification]
-        Task WindowLogMessageAsync(int type, string message, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Sent from the server to the client to signal results of validation runs.
-        /// </summary>
-        [JsonRpcMethod("textDocument/publishDiagnostics")]
-        [JsonRpcNotification]
-        Task TextDocumentPublishDiagnosticsAsync(Uri uri, IReadOnlyList<Diagnostic> diagnostics, int? version = null, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Reports progress against a token.
-        /// </summary>
-        [JsonRpcMethod("$/progress")]
-        [JsonRpcNotification]
-        Task ProgressAsync(string token, WorkDoneProgress value, CancellationToken cancellationToken = default);
-
     }
 
     /// <summary>A client for the API, over any <see cref="JsonRpcPeer"/> (any transport and serializer).</summary>
@@ -222,6 +201,59 @@ namespace Lsp
             return JsonRpcParams.ByPosition(_options, positional);
         }
 
+        private static T? Pushed<T>(JsonElement? @params, int position, string name, JsonSerializerOptions options)
+        {
+            JsonElement? value = null;
+
+            if (@params is { ValueKind: JsonValueKind.Array } array)
+            {
+                if (position < array.GetArrayLength())
+                    value = array[position];
+            }
+            else if (@params is { ValueKind: JsonValueKind.Object } obj && obj.TryGetProperty(name, out var named))
+            {
+                value = named;
+            }
+
+            return value is { ValueKind: not JsonValueKind.Null } present ? present.Deserialize<T>(options) : default;
+        }
+
+        /// <summary>
+        /// Sent from the server to the client to ask the client to log a message.
+        /// </summary>
+        /// <remarks>Pushed by the server. Registering again replaces the previous handler.</remarks>
+        public void OnWindowLogMessage(Action<int, string> handler)
+        {
+            if (handler is null)
+                throw new ArgumentNullException(nameof(handler));
+
+            _peer.OnNotification("window/logMessage", p => handler(Pushed<int>(p, 0, "type", _options)!, Pushed<string>(p, 1, "message", _options)!));
+        }
+
+        /// <summary>
+        /// Sent from the server to the client to signal results of validation runs.
+        /// </summary>
+        /// <remarks>Pushed by the server. Registering again replaces the previous handler.</remarks>
+        public void OnTextDocumentPublishDiagnostics(Action<Uri, int?, IReadOnlyList<Diagnostic>> handler)
+        {
+            if (handler is null)
+                throw new ArgumentNullException(nameof(handler));
+
+            _peer.OnNotification("textDocument/publishDiagnostics", p => handler(Pushed<Uri>(p, 0, "uri", _options)!, Pushed<int?>(p, 1, "version", _options), Pushed<IReadOnlyList<Diagnostic>>(p, 2, "diagnostics", _options)!));
+        }
+
+        /// <summary>
+        /// Reports progress against a token.
+        /// </summary>
+        /// <remarks>Pushed by the server. Registering again replaces the previous handler.</remarks>
+        public void OnProgress(Action<string, WorkDoneProgress> handler)
+        {
+            if (handler is null)
+                throw new ArgumentNullException(nameof(handler));
+
+            _peer.OnNotification("$/progress", p => handler(Pushed<string>(p, 0, "token", _options)!, Pushed<WorkDoneProgress>(p, 1, "value", _options)!));
+        }
+
         public async Task<InitializeResult> InitializeAsync(int? processId, Uri? rootUri, ClientCapabilities capabilities, CancellationToken cancellationToken = default)
         {
             var @params = BuildParams(JsonRpcParamStyle.ByName, new[] { "processId", "rootUri", "capabilities" }, new object?[] { processId, rootUri, capabilities }, new[] { false, false, false });
@@ -247,24 +279,6 @@ namespace Lsp
             var @params = BuildParams(JsonRpcParamStyle.ByName, new[] { "textDocument", "position" }, new object?[] { textDocument, position }, new[] { false, false });
             var element = await _peer.InvokeAsync("textDocument/definition", @params, null, cancellationToken).ConfigureAwait(false);
             return JsonSerializer.Deserialize<IReadOnlyList<Location>>(element, _options)!;
-        }
-
-        public async Task WindowLogMessageAsync(int type, string message, CancellationToken cancellationToken = default)
-        {
-            var @params = BuildParams(JsonRpcParamStyle.ByName, new[] { "type", "message" }, new object?[] { type, message }, new[] { false, false });
-            await _peer.NotifyAsync("window/logMessage", @params, cancellationToken).ConfigureAwait(false);
-        }
-
-        public async Task TextDocumentPublishDiagnosticsAsync(Uri uri, IReadOnlyList<Diagnostic> diagnostics, int? version = null, CancellationToken cancellationToken = default)
-        {
-            var @params = BuildParams(JsonRpcParamStyle.ByName, new[] { "uri", "version", "diagnostics" }, new object?[] { uri, version, diagnostics }, new[] { false, true, false });
-            await _peer.NotifyAsync("textDocument/publishDiagnostics", @params, cancellationToken).ConfigureAwait(false);
-        }
-
-        public async Task ProgressAsync(string token, WorkDoneProgress value, CancellationToken cancellationToken = default)
-        {
-            var @params = BuildParams(JsonRpcParamStyle.ByName, new[] { "token", "value" }, new object?[] { token, value }, new[] { false, false });
-            await _peer.NotifyAsync("$/progress", @params, cancellationToken).ConfigureAwait(false);
         }
     }
 }

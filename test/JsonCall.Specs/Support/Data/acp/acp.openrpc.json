@@ -47,6 +47,7 @@
     {
       "name": "session/update",
       "summary": "Reports progress on a session to the client (a notification from the agent).",
+      "x-jsoncall-direction": "server-to-client",
       "paramStructure": "by-name",
       "params": [
         { "name": "sessionId", "required": true, "schema": { "$ref": "schema.json#/$defs/SessionId" } },
