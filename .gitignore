@@ -499,6 +499,6 @@ gen/
 .claude/settings.local.json
 CLAUDE.local.md
 
-# Coverage reports (PRD NFR-05)
+# Coverage reports (NFR-05, docs/product/quality.md)
 coverage/
 TestResults*/

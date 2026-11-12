@@ -1,14 +1,21 @@
+---
+type: Roadmap
+title: Roadmap
+description: "Where JsonCall stands, the plan to 1.0, risks and what is out of scope."
+tags: [product, planning]
+---
+
 # Roadmap
 
 Where JsonCall is, what stands between it and a 1.0 that teams can depend on, and what it will not try to be.
-Written from a review of the implementation in November 2026. The [PRD](PRD.md) remains the design record; this
+Written from a review of the implementation in November 2026. The rest of this bundle ([index](../index.md)) is the design record; this
 file is the plan.
 
 ## Direction
 
 JsonCall aims to be the .NET library you reach for when a JSON-RPC API has to be **hosted** (ASP.NET Core, every
 transport), **described** (OpenRPC out) and **consumed from its description** (OpenRPC in). It does not try to
-replace StreamJsonRpc for in-process-pair and IDE scenarios. See [the comparison](comparison.md).
+replace StreamJsonRpc for in-process-pair and IDE scenarios. See [the comparison](../guides/comparison.md).
 
 Three commitments follow from that:
 
@@ -19,8 +26,8 @@ Three commitments follow from that:
 
 ## Where it stands
 
-All six phases of the PRD are implemented and 274 scenarios pass. Measured against the PRD's own non-functional
-requirements:
+All six delivery phases are implemented and 274 scenarios pass. Measured against the [non-functional
+requirements](quality.md):
 
 | Requirement | Target | Today |
 | --- | --- | --- |
@@ -29,8 +36,8 @@ requirements:
 | NFR-04 Compatibility | .NET 10 | Met. Revisit below. |
 | NFR-05 Quality gates | 85% line coverage on Core, Server, Client | Not measured. |
 | NFR-06 Documentation | XML docs on every public API, a quickstart per package | 233 public members undocumented: Core 143, Transport 28, Server 27, OpenRpc 12, AspNetCore 10, Client 5, serializers 8. |
-| §8 Interop testing | StreamJsonRpc as a conformance peer | Not present. |
-| D2 Streaming convention | Ratified | Draft. Now written down in [streaming.md](streaming.md). |
+| Interop testing ([quality](quality.md)) | StreamJsonRpc as a conformance peer | Not present. |
+| [0002](../decisions/0002-stream-wire-convention.md) Streaming convention | Ratified | Draft. Written down in [the streaming guide](../guides/streaming.md). |
 
 ## 0.1: first preview on NuGet
 
@@ -61,7 +68,7 @@ covered by a scenario yet; each should get one. Each is tracked as the GitHub is
 - [ ] Reserve the `JsonCall.` prefix on NuGet.
 - [ ] Release workflow: a tag builds in Release, packs, and publishes with NuGet trusted publishing.
 - [ ] CI matrix on Linux, macOS and Windows. Today only Linux runs, and the Unix socket scenarios skip on Windows.
-- [ ] `CHANGELOG.md`, and release notes generated from it.
+- [ ] Release notes on GitHub Releases, generated from the merged pull requests and closed issues, then edited.
 - [ ] `samples/`: an ASP.NET Core service with a generated client, and a stdio server.
 - [ ] Package icon. A short README per package, so each NuGet page opens with that package's own quick start.
 
@@ -96,7 +103,7 @@ Breaking changes belong here, all at once, before anyone depends on the shapes.
   `JsonCall.Client` and `JsonCall.Transport`. Consider one `JsonCall` namespace for the types users touch.
 - **Transport interface.** `IMessageTransport.ReceiveAsync` returns `byte[]`, and `IMessageSerializer` transcodes
   through a full copy. Move to `ReadOnlySequence<byte>` and `IBufferWriter<byte>` so messages can be pooled.
-- **Ratify the stream convention** (D2). Open questions: per-stream flow control, whether `seq` is checked, whether
+- **Ratify the stream convention** ([0002](../decisions/0002-stream-wire-convention.md)). Open questions: per-stream flow control, whether `seq` is checked, whether
   HTTP streaming should also be offered as newline-delimited JSON, and alignment with the `$/cancelRequest` and
   `$/progress` names used by LSP.
 - **Target frameworks.** Decide whether to add `net8.0` (LTS) for the runtime packages. It widens the audience
@@ -110,7 +117,7 @@ Breaking changes belong here, all at once, before anyone depends on the shapes.
   the server dispatch table, replacing `DispatchProxy` and `MethodInfo.Invoke`. Then `IsAotCompatible` on every
   package, enforced in CI by publishing a sample with `PublishAot`.
 - **Interop suite.** Run the server against StreamJsonRpc and a JavaScript JSON-RPC client, and the generated
-  clients against a non-.NET OpenRPC server, in CI (PRD §8).
+  clients against a non-.NET OpenRPC server, in CI ([quality](quality.md)).
 - **OpenRPC 1.4** when its meta-schema is published; until then the document stays at 1.3.2.
 - **Documentation site** with an API reference generated from the XML docs.
 - A stability statement: semantic versioning, and which extensions are stable.
@@ -126,9 +133,32 @@ Ideas, not commitments.
 - OpenRPC `links`, `examples` and `servers` variables in generated clients.
 - An analyzer for contract mistakes: duplicate wire names, unsupported parameter types, `rpc.` prefixes.
 
+## Risks
+
+| Risk | Mitigation |
+| --- | --- |
+| The streaming convention is in neither JSON-RPC nor OpenRPC. | Keep it behind `x-jsoncall-stream`, document it as an extension, interop-test it, ratify it before 1.0 ([0002](../decisions/0002-stream-wire-convention.md)). |
+| A large surface for one library. | Each package stays independently useful; operability and API freeze come before new features. |
+| Reinventing StreamJsonRpc. | Stay differentiated: ASP.NET Core native, OpenRPC in and out, SSE streaming, pluggable transports and wire formats ([0001](../decisions/0001-own-wire-layer.md)). |
+
+## Delivered
+
+The original delivery phases, all complete. Each phase's exit criterion was its feature files passing.
+
+| Phase | Scope | Feature files |
+| --- | --- | --- |
+| 0. Foundation | Repository on .NET 10, Reqnroll harness, CI | `00` |
+| 1. Core and client | Protocol model, serializers, `IMessageTransport`, WebSocket, TCP, stdio, correlating client | `01` to `04` |
+| 2. Server and hosting | Dispatcher, `JsonCall.AspNetCore`, HTTP and WebSocket, typed proxy | `03`, `06` |
+| 3. Streaming | SSE and the `$/stream` convention, client consumption, cleanup | `05` (convention still draft) |
+| 4. OpenRPC out | Document generator, `rpc.discover`, meta-schema validation | `07` |
+| 5. OpenRPC in | Source generator and `jsoncall` tool, round trip | `08` |
+| 6. Daemon fit | Sibling `$ref` resolution, newline framing, Unix domain sockets | `02`, `08` |
+| 7. Push | `JsonRpcConnectionSet` broadcast, typed handlers for server-pushed notifications | `09`, `10` |
+
 ## Out of scope
 
 - JSON-RPC 1.0 and 1.1.
 - Clients in languages other than C#. The OpenRPC document is the bridge to other ecosystems' generators.
 - Authentication schemes. Hosting uses ASP.NET Core's.
-- Wrapping StreamJsonRpc (PRD decision D1).
+- Wrapping StreamJsonRpc ([0001](../decisions/0001-own-wire-layer.md)).

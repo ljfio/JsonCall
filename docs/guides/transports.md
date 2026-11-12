@@ -1,3 +1,10 @@
+---
+type: Guide
+title: Transports and wire formats
+description: "Transports, framing, binary wire formats, limits, broadcasting."
+tags: [guide, transport, serialization]
+---
+
 # Transports and wire formats
 
 JsonCall separates three things that most JSON-RPC libraries weld together:

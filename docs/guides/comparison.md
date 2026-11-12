@@ -1,3 +1,10 @@
+---
+type: Guide
+title: How JsonCall compares
+description: "JsonCall against StreamJsonRpc and others, and when to choose each."
+tags: [guide, positioning]
+---
+
 # How JsonCall compares
 
 An honest positioning against the .NET JSON-RPC libraries people already use, written in November 2026. Other
@@ -52,7 +59,7 @@ of those protocols, use its SDK.
 
 ## Where JsonCall is behind
 
-These are the gaps a team evaluating the package will find. Each is on the [roadmap](ROADMAP.md).
+These are the gaps a team evaluating the package will find. Each is on the [roadmap](../product/roadmap.md).
 
 - **Track record.** No releases, no production users, one maintainer.
 - **Target frameworks.** .NET 10 only. Top-tier libraries support the current LTS releases, and often

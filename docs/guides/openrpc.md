@@ -1,3 +1,10 @@
+---
+type: Guide
+title: OpenRPC
+description: "Document generation, rpc.discover, client generation, diagnostics."
+tags: [guide, openrpc, generator]
+---
+
 # OpenRPC
 
 [OpenRPC](https://open-rpc.org) is to JSON-RPC what OpenAPI is to REST: a machine-readable description of an API.

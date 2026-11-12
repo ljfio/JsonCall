@@ -489,7 +489,7 @@ public sealed class OpenRpcSteps
     [When(@"^the document is validated against the OpenRPC 1\.4 meta-schema$")]
     public void WhenValidated()
     {
-        // The newest published meta-schema is open-rpc/meta-schema 1.14.9 (OpenRPC spec 1.3.x); see docs/PRD.md.
+        // The newest published meta-schema is open-rpc/meta-schema 1.14.9 (OpenRPC spec 1.3.x); see docs/decisions/0008-openrpc-version.md.
         var text = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Support", "Data", "openrpc-meta-schema-1.4.json"));
 
         // The released schema points at meta.json-schema.tools for JSON Schema; use the Draft 07 meta-schema instead.

@@ -39,3 +39,25 @@ jobs:
       with:
         name: test-results
         path: TestResults/**/*.trx
+
+  docs:
+    runs-on: ubuntu-latest
+    env:
+      OKF_VERSION: 0.5.2
+      OKF_SHA256: 05ecf191f1ef1396cdeefa9a1fd877d491b32b91f2a4a4d06393656e880e90b6
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install okf
+      run: |
+        curl -fsSLo okf.tar.gz "https://github.com/okfcli/okf/releases/download/v${OKF_VERSION}/okf_${OKF_VERSION}_linux_amd64.tar.gz"
+        echo "${OKF_SHA256}  okf.tar.gz" | sha256sum -c -
+        tar -xzf okf.tar.gz okf && sudo mv okf /usr/local/bin/okf && rm okf.tar.gz
+
+    # The indexes are generated; fail if someone edited a doc without regenerating them.
+    - name: Indexes are current
+      run: okf index docs > /dev/null && git diff --exit-code -- docs
+
+    - name: Validate knowledge bundle
+      run: okf validate docs

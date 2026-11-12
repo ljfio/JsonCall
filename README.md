@@ -6,7 +6,7 @@ One C# interface drives the server, a typed client, `IAsyncEnumerable<T>` stream
 An OpenRPC document, yours or someone else's, becomes a typed C# client at build time.
 
 > **Status: preview (0.1).** The JSON-RPC core is covered by 274 executable specifications. The streaming wire
-> convention is a draft and the public API is not frozen. See the [roadmap](https://github.com/ljfio/JsonCall/blob/main/docs/ROADMAP.md) for what stands
+> convention is a draft and the public API is not frozen. See the [roadmap](https://github.com/ljfio/JsonCall/blob/main/docs/product/roadmap.md) for what stands
 > between this and 1.0.
 
 ## What you get
@@ -135,13 +135,13 @@ Or on the command line: `jsoncall generate api.openrpc.json --out ./gen`, or str
 
 | Guide | Covers |
 | --- | --- |
-| [Getting started](https://github.com/ljfio/JsonCall/blob/main/docs/getting-started.md) | Contracts, servers with and without ASP.NET Core, clients, errors, cancellation, batches, authorization |
-| [Transports and wire formats](https://github.com/ljfio/JsonCall/blob/main/docs/transports.md) | Each transport, framing, CBOR and MessagePack, size limits, broadcasting, writing your own |
-| [Streaming](https://github.com/ljfio/JsonCall/blob/main/docs/streaming.md) | `IAsyncEnumerable<T>` end to end, and the wire convention for implementers in other languages |
-| [OpenRPC](https://github.com/ljfio/JsonCall/blob/main/docs/openrpc.md) | Document generation, `rpc.discover`, client generation, schema mapping, generator diagnostics |
-| [Comparison](https://github.com/ljfio/JsonCall/blob/main/docs/comparison.md) | How JsonCall differs from StreamJsonRpc and other .NET JSON-RPC libraries, and when to choose them |
-| [Roadmap](https://github.com/ljfio/JsonCall/blob/main/docs/ROADMAP.md) | Known issues, what is planned before 1.0, and what is out of scope |
-| [Product requirements](https://github.com/ljfio/JsonCall/blob/main/docs/PRD.md) | The design record: goals, requirements and decisions |
+| [Getting started](https://github.com/ljfio/JsonCall/blob/main/docs/guides/getting-started.md) | Contracts, servers with and without ASP.NET Core, clients, errors, cancellation, batches, authorization |
+| [Transports and wire formats](https://github.com/ljfio/JsonCall/blob/main/docs/guides/transports.md) | Each transport, framing, CBOR and MessagePack, size limits, broadcasting, writing your own |
+| [Streaming](https://github.com/ljfio/JsonCall/blob/main/docs/guides/streaming.md) | `IAsyncEnumerable<T>` end to end, and the wire convention for implementers in other languages |
+| [OpenRPC](https://github.com/ljfio/JsonCall/blob/main/docs/guides/openrpc.md) | Document generation, `rpc.discover`, client generation, schema mapping, generator diagnostics |
+| [Comparison](https://github.com/ljfio/JsonCall/blob/main/docs/guides/comparison.md) | How JsonCall differs from StreamJsonRpc and other .NET JSON-RPC libraries, and when to choose them |
+| [Roadmap](https://github.com/ljfio/JsonCall/blob/main/docs/product/roadmap.md) | Known issues, what is planned before 1.0, and what is out of scope |
+| [Project knowledge](https://github.com/ljfio/JsonCall/blob/main/docs/index.md) | The design record: product, capabilities and requirements, decisions |
 
 ## Building and testing
 
@@ -151,8 +151,9 @@ dotnet test
 ```
 
 Acceptance criteria live in [`specs/features`](https://github.com/ljfio/JsonCall/tree/main/specs/features) as Gherkin and run through Reqnroll and xUnit in
-`test/JsonCall.Specs`. Every requirement in the PRD is tagged on the scenarios that prove it (`@FR-...`). Step
-definitions go in `test/JsonCall.Specs/Steps`; `dotnet test` reports a scenario without one as skipped.
+`test/JsonCall.Specs`. Every requirement in [`docs/capabilities`](https://github.com/ljfio/JsonCall/tree/main/docs/capabilities) is tagged on the scenarios that prove it (`@FR-...`). Step
+definitions go in `test/JsonCall.Specs/Steps`; `dotnet test` reports a scenario without one as skipped. Contributors and agents start with
+[`AGENTS.md`](https://github.com/ljfio/JsonCall/blob/main/AGENTS.md).
 
 ## License
 

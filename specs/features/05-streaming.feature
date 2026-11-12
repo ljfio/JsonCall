@@ -4,7 +4,7 @@ Feature: Streaming responses with IAsyncEnumerable
   I want a method to return IAsyncEnumerable<T> and have items reach the client as they are produced
   So that I can push events and large result sets without buffering
 
-  # The wire convention for streams is a DRAFT (PRD decision D2).
+  # The wire convention for streams is a DRAFT (decision 0002, docs/decisions/0002-stream-wire-convention.md).
   # Scenarios whose steps mention "$/stream" or SSE event names are tagged @draft.
 
   Background:

@@ -13,7 +13,7 @@
     </PropertyGroup>
 
     <!--
-      Version. Pre-release until the items under "Before 1.0" in docs/ROADMAP.md are closed: the streaming wire
+      Version. Pre-release until the milestones up to 1.0 in docs/product/roadmap.md are met: the streaming wire
       convention is still a draft and the public API is not frozen. -p:VersionSuffix=preview.2 overrides the suffix;
       delete the VersionSuffix line to cut a stable release.
     -->
@@ -32,7 +32,7 @@
 
     <!--
       Projects under src/ ship their XML documentation, so IntelliSense shows it. CS1591 (public member without
-      documentation) stays off until the backlog in docs/ROADMAP.md is cleared; then remove the NoWarn.
+      documentation) stays off until the backlog in docs/product/roadmap.md is cleared; then remove the NoWarn.
     -->
     <PropertyGroup Condition="$(MSBuildProjectDirectory.Replace('\', '/').Contains('/src/'))">
         <GenerateDocumentationFile>true</GenerateDocumentationFile>

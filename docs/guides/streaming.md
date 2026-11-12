@@ -1,10 +1,18 @@
+---
+type: Guide
+title: Streaming
+description: "IAsyncEnumerable<T> end to end, and the wire convention."
+tags: [guide, streaming]
+status: draft
+---
+
 # Streaming
 
 A contract method that returns `IAsyncEnumerable<T>` is a stream. Items reach the caller as they are produced, on
 every transport.
 
 > **Draft.** JSON-RPC 2.0 does not define streaming, so this is a JsonCall extension. The convention below is
-> implemented and tested, but it is not ratified (decision D2 in the [PRD](PRD.md)) and may change before 1.0. It is
+> implemented and tested, but it is not ratified ([decision 0002](../decisions/0002-stream-wire-convention.md)) and may change before 1.0. It is
 > written down here so that clients in other languages can implement it and so that changes to it are deliberate.
 
 ## Using it

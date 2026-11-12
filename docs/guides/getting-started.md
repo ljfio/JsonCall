@@ -1,3 +1,10 @@
+---
+type: Guide
+title: Getting started
+description: "Contracts, servers, clients, errors, cancellation, batches, auth."
+tags: [guide, client, server, aspnetcore]
+---
+
 # Getting started
 
 This guide walks through a contract, a server, a client, and the things you will need next: errors, cancellation,
