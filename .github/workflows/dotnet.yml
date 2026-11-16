@@ -63,3 +63,39 @@ jobs:
 
     - name: Validate knowledge bundle
       run: okf validate docs
+
+  # Every push to main publishes its MinVer height version (such as 0.1.1-preview.0.5) to GitHub Packages, so a
+  # change can be tried before it is released. nuget.org only receives tagged releases (release.yml). See
+  # docs/decisions/0011-only-release-tags-publish.md.
+  preview:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [ build, docs ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0          # MinVer reads the version from tags
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Pack
+      run: dotnet pack JsonCall.slnx --configuration Release --output ./artifacts
+
+    # A commit that is already tagged is a release; release.yml publishes it.
+    - name: Push to GitHub Packages
+      run: |
+        if ls ./artifacts/*.nupkg | grep -qv -- '-preview\.'; then
+          echo "Commit is tagged as a release; nothing to publish here."
+          exit 0
+        fi
+        dotnet nuget push "./artifacts/*.nupkg" \
+          --api-key "${{ secrets.GITHUB_TOKEN }}" \
+          --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+          --skip-duplicate

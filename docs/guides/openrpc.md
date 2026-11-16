@@ -70,8 +70,8 @@ var json = OpenRpcDocumentGenerator.ToJson(generator.Generate(new[] { typeof(IOr
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="JsonCall.Generator" Version="0.1.0-preview.1" PrivateAssets="all" />
-  <PackageReference Include="JsonCall.Client" Version="0.1.0-preview.1" />
+  <PackageReference Include="JsonCall.Generator" Version="0.1.0" PrivateAssets="all" />
+  <PackageReference Include="JsonCall.Client" Version="0.1.0" />
   <AdditionalFiles Include="orders.openrpc.json" Namespace="Acme.Orders" ClientName="OrdersClient" />
 </ItemGroup>
 ```

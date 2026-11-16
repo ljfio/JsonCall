@@ -97,12 +97,16 @@ Body: `# Requirements` (each `**FR-AREA-NN** statement`, one or two sentences), 
 ## Releasing
 
 Versions come from git tags through MinVer; never set `Version` in a project file
-(`docs/decisions/0010-versioning-and-release.md`). To release, tag `main` and push the tag:
+(`docs/decisions/0011-only-release-tags-publish.md`). To release, tag `main` with a complete version and push the
+tag:
 
 ```sh
-git tag v0.1.0-preview.1
-git push origin v0.1.0-preview.1
+git tag v0.1.0
+git push origin v0.1.0
 ```
+
+Only `vMAJOR.MINOR.PATCH` tags publish to nuget.org. A tag with a suffix (`v1.0.0-rc.1`) runs nothing. Every push to
+`main` publishes a preview (`0.1.1-preview.0.N`) to GitHub Packages.
 
 `.github/workflows/release.yml` tests, packs, publishes to NuGet and creates the GitHub Release. Edit the generated
 notes there.

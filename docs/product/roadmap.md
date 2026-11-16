@@ -39,7 +39,7 @@ requirements](quality.md):
 | Interop testing ([quality](quality.md)) | StreamJsonRpc as a conformance peer | Not present. |
 | [0002](../decisions/0002-stream-wire-convention.md) Streaming convention | Ratified | Draft. Written down in [the streaming guide](../guides/streaming.md). |
 
-## 0.1: first preview on NuGet
+## 0.1: first release on NuGet
 
 The goal is a package that is safe to try. Nothing here changes the public API.
 
@@ -60,15 +60,15 @@ covered by a scenario yet; each should get one. Each is tracked as the GitHub is
 
 ### Ship
 
-- [x] Versions from git tags with MinVer; untagged builds are pre-releases ([0010](../decisions/0010-versioning-and-release.md)).
+- [x] Versions from git tags with MinVer; only `vX.Y.Z` tags publish to nuget.org, every push to `main` publishes a preview to GitHub Packages ([0011](../decisions/0011-only-release-tags-publish.md)).
 - [x] XML documentation files in the packages.
 - [x] Source Link, embedded symbols, deterministic CI builds.
 - [x] `JsonCall.Tool` as the tool's package id (it was `jsoncall`).
 - [x] User documentation: getting started, transports, streaming, OpenRPC, comparison.
 - [ ] Reserve the `JsonCall.` prefix on NuGet.
-- [x] Release workflow: a `v*` tag builds in Release, packs, publishes with NuGet trusted publishing and creates the
+- [x] Release workflow: a `vX.Y.Z` tag builds in Release, packs, publishes with NuGet trusted publishing and creates the
   GitHub Release.
-- [ ] Trusted publishing policy on nuget.org, `NUGET_USER` variable and `nuget` environment on GitHub.
+- [x] Trusted publishing policy on nuget.org, `NUGET_USER` variable and `nuget` environment on GitHub.
 - [ ] CI matrix on Linux, macOS and Windows. Today only Linux runs, and the Unix socket scenarios skip on Windows.
 - [x] Release notes on GitHub Releases, generated from the merged pull requests and closed issues, then edited.
 - [ ] `samples/`: an ASP.NET Core service with a generated client, and a stdio server.

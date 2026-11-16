@@ -3,7 +3,7 @@
     <!-- Metadata shared by every package. Each project sets its own Description. -->
     <PropertyGroup>
         <Authors>Luke Fisher</Authors>
-        <Copyright>Copyright (c) 2023 Luke Fisher</Copyright>
+        <Copyright>Copyright (c) 2023-2026 Luke Fisher</Copyright>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageProjectUrl>https://github.com/ljfio/JsonCall</PackageProjectUrl>
         <RepositoryUrl>https://github.com/ljfio/JsonCall</RepositoryUrl>
@@ -13,10 +13,10 @@
     </PropertyGroup>
 
     <!--
-      Version comes from git tags, through MinVer. Tag a commit v0.1.0-preview.1 and that commit builds as
-      0.1.0-preview.1. Untagged commits after it build as 0.1.0-preview.1.N (N commits since the tag); before any tag
-      they build as 0.1.0-preview.0.N. A tag without a suffix (v1.0.0) is a stable release. MinVer needs the full
-      history: CI checks out with fetch-depth 0. See docs/decisions/0010-versioning-and-release.md.
+      Version comes from git tags, through MinVer. Tag a commit v0.1.0 and that commit builds as 0.1.0, and
+      pushing the tag publishes it. Untagged commits after it build as 0.1.1-preview.0.N (N commits since the tag);
+      before any tag they build as 0.1.0-preview.0.N. Previews go to GitHub Packages, releases to nuget.org. MinVer needs the full
+      history: CI checks out with fetch-depth 0. See docs/decisions/0011-only-release-tags-publish.md.
     -->
     <PropertyGroup>
         <MinVerTagPrefix>v</MinVerTagPrefix>

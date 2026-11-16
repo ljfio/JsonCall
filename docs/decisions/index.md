@@ -17,4 +17,5 @@ Directory: `decisions/`
 | [0008: Generated documents declare OpenRPC 1.3.2](0008-openrpc-version.md) | Decision | Documents declare OpenRPC 1.3.2; the generator reads 1.0 to 1.4. |
 | [0009: The name JsonCall](0009-name.md) | Decision | JsonCall, and the names derived from it. |
 | [0010: Versions come from git tags; a tag publishes to NuGet](0010-versioning-and-release.md) | Decision | MinVer derives versions from v* tags; pushing a tag releases to NuGet. |
+| [0011: Release tags publish to NuGet; every push to main is a preview](0011-only-release-tags-publish.md) | Decision | vX.Y.Z tags publish to nuget.org; pushes to main publish previews to GitHub. |
 

@@ -3,8 +3,10 @@ type: Decision
 title: "0010: Versions come from git tags; a tag publishes to NuGet"
 description: "MinVer derives versions from v* tags; pushing a tag releases to NuGet."
 tags: [decision, release, packaging]
-status: stable
+status: deprecated
 ---
+
+Superseded by 0011.
 
 # Context
 

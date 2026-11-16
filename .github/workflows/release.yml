@@ -1,12 +1,13 @@
 name: Release
 
-# Pushing a tag such as v0.1.0-preview.1 or v1.0.0 builds, tests and packs that commit, publishes the packages to
-# NuGet and creates the GitHub Release. MinVer turns the tag into the package version. See
-# docs/decisions/0010-versioning-and-release.md.
+# Pushing a release tag such as v0.1.0 or v1.2.3 builds, tests and packs that commit, publishes the packages to
+# NuGet and creates the GitHub Release. MinVer turns the tag into the package version. Only complete versions
+# publish: a tag with a suffix (v1.0.0-rc.1) does not match and runs nothing. See
+# docs/decisions/0011-only-release-tags-publish.md.
 
 on:
   push:
-    tags: [ "v*" ]
+    tags: [ "v[0-9]+.[0-9]+.[0-9]+" ]
 
 permissions:
   contents: write               # create the GitHub Release
@@ -39,9 +40,12 @@ jobs:
     - name: Pack
       run: dotnet pack JsonCall.slnx --no-build --configuration Release --output ./artifacts
 
-    # Fail before publishing anything if MinVer did not take the version from this tag.
+    # Fail before publishing anything if the tag is not a complete version, or MinVer did not take the version from it.
     - name: Check version matches tag
       run: |
+        if ! [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::${GITHUB_REF_NAME} is not a release tag (vMAJOR.MINOR.PATCH)"; exit 1
+        fi
         expected="${GITHUB_REF_NAME#v}"
         for pkg in ./artifacts/*.nupkg; do
           case "$(basename "$pkg")" in
@@ -67,7 +71,4 @@ jobs:
     - name: Create GitHub Release
       env:
         GH_TOKEN: ${{ github.token }}
-      run: |
-        prerelease=""
-        case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
-        gh release create "$GITHUB_REF_NAME" ./artifacts/*.nupkg --verify-tag --generate-notes $prerelease
+      run: gh release create "$GITHUB_REF_NAME" ./artifacts/*.nupkg --verify-tag --generate-notes
